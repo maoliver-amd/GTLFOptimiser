@@ -46,10 +46,12 @@ target_sources(GLTFOptimiser PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/source/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/cgltf.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/stb.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/source/ImageOptimiser.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/source/ImageOptimiser.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/Shared.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/Shared.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/ImageOptimiser.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/ImageOptimiser.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/MeshOptimiser.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/MeshOptimiser.cpp"
 )
 
 target_compile_features(GLTFOptimiser

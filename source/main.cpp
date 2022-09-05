@@ -15,6 +15,7 @@
  */
 
 #include "ImageOptimiser.h"
+#include "MeshOptimiser.h"
 #include "Shared.h"
 #include "Version.h"
 
@@ -80,8 +81,13 @@ int main(int argc, char* argv[])
     folderPos = inputFile.find_last_not_of("/\\", folderPos);
     std::string imageFolder = (folderPos != string::npos ? std::string(inputFile, 0, folderPos + 1) : inputFile);
 
-    // TODO: Optimise meshes etc.
-    // TODO: Remove any materials not being used
+    // TODO: optionally strip material names, mesh names, camera names etc.
+
+    // Optimise meshes
+    MeshOptimiser meshOpt(dataCGLTF, imageFolder);
+    if (!meshOpt.passMeshes()) {
+        return 1;
+    }
 
     // Optimise images
     ImageOptimiser imageOpt(dataCGLTF, imageFolder);

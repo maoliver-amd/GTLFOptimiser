@@ -20,12 +20,30 @@
 
 #include <ktx.h>
 #include <map>
+#include <set>
 #include <stb_image.h>
 #include <thread>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 using namespace std;
+
+extern void cgltf_free_extensions(cgltf_data* data, cgltf_extension* extensions, cgltf_size extensions_count);
+
+static void cgltf_remove_image(cgltf_data* data, cgltf_image* image)
+{
+    data->memory.free(data->memory.user_data, image->name);
+    data->memory.free(data->memory.user_data, image->uri);
+    data->memory.free(data->memory.user_data, image->mime_type);
+
+    cgltf_free_extensions(data, image->extensions, image->extensions_count);
+}
+
+static void cgltf_remove_texture(cgltf_data* data, cgltf_texture* texture)
+{
+    data->memory.free(data->memory.user_data, texture->name);
+    cgltf_free_extensions(data, texture->extensions, texture->extensions_count);
+}
 
 class TextureLoad
 {
@@ -80,12 +98,12 @@ ImageOptimiser::ImageOptimiser(shared_ptr<cgltf_data>& data, const std::string& 
 bool ImageOptimiser::passTextures() noexcept
 {
     // Loop through and collect list of all valid images
-    vector<cgltf_image*> removedImages;
-    vector<cgltf_texture*> removedTextures;
+    set<cgltf_image*> removedImages;
+    set<cgltf_texture*> removedTextures;
     for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
         cgltf_texture& texture = dataCGLTF->textures[i];
         if (texture.image == nullptr && texture.basisu_image == nullptr) {
-            removedTextures.push_back(&texture);
+            removedTextures.insert(&texture);
             continue;
         }
         if (texture.image == nullptr) {
@@ -95,11 +113,43 @@ bool ImageOptimiser::passTextures() noexcept
         }
         cgltf_image* image = texture.image;
         if (image->uri == nullptr) {
-            removedImages.push_back(image);
-            removedTextures.push_back(&texture);
+            removedImages.insert(image);
+            removedTextures.insert(&texture);
             continue;
         }
         images[image] = false;
+    }
+
+    // Loop through all materials and check for unused textures
+    set<cgltf_texture*> validTextures;
+    for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
+        cgltf_material& material = dataCGLTF->materials[i];
+        runOverMaterialTextures(
+            material, [&](cgltf_texture*& p, bool sRGB, bool split = false) { validTextures.insert(p); });
+    }
+    for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
+        cgltf_texture* texture = &dataCGLTF->textures[i];
+        if (!validTextures.contains(texture)) {
+            removedTextures.insert(texture);
+        }
+    }
+
+    // Loop through all textures and check for unused images
+    set<cgltf_image*> validImages;
+    for (size_t i = 0; i < dataCGLTF->textures_count; ++i) {
+        cgltf_texture& texture = dataCGLTF->textures[i];
+        if (texture.basisu_image != nullptr) {
+            validImages.insert(texture.basisu_image);
+        }
+        if (texture.image != nullptr) {
+            validImages.insert(texture.image);
+        }
+    }
+    for (cgltf_size i = 0; i < dataCGLTF->images_count; ++i) {
+        cgltf_image* image = &dataCGLTF->images[i];
+        if (!validImages.contains(image)) {
+            removedImages.insert(image);
+        }
     }
 
     // Remove any found invalid images/textures
@@ -122,18 +172,29 @@ bool ImageOptimiser::passTextures() noexcept
 void ImageOptimiser::removeImage(cgltf_image* image) noexcept
 {
     // Remove the image from the images list
-    for (cgltf_size i = 0; i < dataCGLTF->images_count; ++i) {
+    cgltf_size i = 0;
+    while (true) {
         cgltf_image* current = &dataCGLTF->images[i];
         if (current == image) {
             printWarning("Removed unused image: "s + ((current->name != nullptr) ? current->name : "unknown"));
+            if (current->uri != nullptr) {
+                // Delete file from disk
+                string imageFile = rootFolder + image->uri;
+                remove(imageFile.c_str());
+            }
+            // Remove image from gltf
+            cgltf_remove_image(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->images_count - i - 1) * sizeof(cgltf_image));
             --dataCGLTF->images_count;
+            break;
+        }
+        if (++i >= dataCGLTF->images_count) {
             break;
         }
     }
 
     // Loop through all textures and set any matching pointers to null
-    cgltf_size i = 0;
+    i = 0;
     while (true) {
         cgltf_texture* current = &dataCGLTF->textures[i];
         if (current->image == image) {
@@ -155,20 +216,29 @@ void ImageOptimiser::removeImage(cgltf_image* image) noexcept
 void ImageOptimiser::removeTexture(cgltf_texture* texture) noexcept
 {
     // Remove the texture from the textures list
-    for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
+    cgltf_size i = 0;
+    while (true) {
         cgltf_texture* current = &dataCGLTF->textures[i];
         if (current == texture) {
             printWarning("Removed unused texture: "s + ((current->name != nullptr) ? current->name : "unknown"));
+            cgltf_remove_texture(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->textures_count - i - 1) * sizeof(cgltf_texture));
             --dataCGLTF->textures_count;
+            break;
+        }
+        if (++i >= dataCGLTF->textures_count) {
             break;
         }
     }
 
     // Loop through all materials and set any matching pointers to null
-    for (cgltf_size i = 0; i < dataCGLTF->materials_count; ++i) {
+    for (i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& current = dataCGLTF->materials[i];
-        runOverMaterialTextures(current, [](cgltf_texture*& p, bool sRGB, bool b = false) { p = nullptr; });
+        runOverMaterialTextures(current, [&](cgltf_texture*& p, bool sRGB, bool b = false) {
+            if (p == texture) {
+                p = nullptr;
+            }
+        });
     }
 }
 
