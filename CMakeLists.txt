@@ -67,6 +67,14 @@ target_include_directories(GLTFOptimiser
     "${VULKAN_HEADERS_INCLUDE_DIRS}"
 )
 
+if(MSVC)
+    target_compile_definitions(GLTFOptimiser PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_compile_options(GLTFOptimiser PRIVATE /W4)
+    if(CMAKE_BUILD_TYPE EQUAL "DEBUG")
+        target_compile_options(GLTFOptimiser PRIVATE /fsanitize=address)
+    endif()
+endif()
+
 target_link_libraries(GLTFOptimiser PRIVATE
     KTX::ktx
 	#meshoptimizer::meshoptimizer

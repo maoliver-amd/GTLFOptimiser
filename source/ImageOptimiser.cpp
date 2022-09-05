@@ -86,9 +86,11 @@ void runOverMaterialTextures(cgltf_material& material, Func function) noexcept
     function(material.transmission.transmission_texture.texture, false);
 }
 
-ImageOptimiser::ImageOptimiser(shared_ptr<cgltf_data>& data, const std::string& folder) noexcept
+ImageOptimiser::ImageOptimiser(
+    shared_ptr<cgltf_data>& data, const std::string& folder, bool keepOriginalTextures) noexcept
     : dataCGLTF(data)
     , rootFolder(folder)
+    , keepTextures(keepOriginalTextures)
 {
     if (!rootFolder.empty() && rootFolder.back() != '/' && rootFolder.back() != '\\') {
         rootFolder += '/';
@@ -124,8 +126,11 @@ bool ImageOptimiser::passTextures() noexcept
     set<cgltf_texture*> validTextures;
     for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& material = dataCGLTF->materials[i];
-        runOverMaterialTextures(
-            material, [&](cgltf_texture*& p, bool sRGB, bool split = false) { validTextures.insert(p); });
+        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool = false) {
+            if (p != nullptr) {
+                validTextures.insert(p);
+            }
+        });
     }
     for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
         cgltf_texture* texture = &dataCGLTF->textures[i];
@@ -234,7 +239,7 @@ void ImageOptimiser::removeTexture(cgltf_texture* texture) noexcept
     // Loop through all materials and set any matching pointers to null
     for (i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& current = dataCGLTF->materials[i];
-        runOverMaterialTextures(current, [&](cgltf_texture*& p, bool sRGB, bool b = false) {
+        runOverMaterialTextures(current, [&](cgltf_texture*& p, bool, bool = false) {
             if (p == texture) {
                 p = nullptr;
             }
@@ -259,7 +264,7 @@ bool ImageOptimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool spli
     }
 
     // Load in existing texture
-    if (image->uri == nullptr) {
+    if (image->uri == nullptr || strlen(image->uri) == 0) {
         return false;
     }
     string imageFile = rootFolder + image->uri;
@@ -302,23 +307,44 @@ bool ImageOptimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool spli
     images[image] = true;
 
     // Update texture with new image
+    cgltf_image* newImage = nullptr;
+    if (keepTextures) {
+        // Create new image
+        auto newMemory = realloc(dataCGLTF->images, (dataCGLTF->images_count + 1) * sizeof(cgltf_image));
+        if (newMemory == nullptr) {
+            printError("Out of memory"sv);
+            return false;
+        }
+        dataCGLTF->images = static_cast<cgltf_image*>(newMemory);
+        newImage = &dataCGLTF->images[dataCGLTF->images_count];
+        *newImage = {0};
+        ++dataCGLTF->images_count;
+    } else {
+        // Reuse existing image allocation
+        newImage = image;
+
+        // Remove old texture file
+        printInfo("Removing old texture: "s + imageFile);
+        remove(imageFile.c_str());
+        texture->image = nullptr;
+    }
     string newFile = imageFileName.substr(rootFolder.length()) + ".ktx2";
-    auto newMemory = (char*)realloc(image->uri, newFile.length() + 1);
+    auto newMemory = realloc(newImage->uri, newFile.length() + 1);
     if (newMemory == nullptr) {
         printError("Out of memory"sv);
         return false;
     }
-    image->uri = newMemory;
-    strcpy(image->uri, newFile.data());
-    newMemory = (char*)realloc(image->mime_type, 11);
+    newImage->uri = static_cast<char*>(newMemory);
+    std::strcpy(newImage->uri, newFile.data());
+    string_view mimeType = "image/ktx2"sv;
+    newMemory = realloc(newImage->mime_type, mimeType.length() + 1);
     if (newMemory == nullptr) {
         printError("Out of memory"sv);
         return false;
     }
-    image->mime_type = newMemory;
-    strcpy(image->mime_type, "image/ktx2");
-    texture->image = nullptr;
-    texture->basisu_image = image;
+    newImage->mime_type = static_cast<char*>(newMemory);
+    std::strcpy(newImage->mime_type, mimeType.data());
+    texture->basisu_image = newImage;
     texture->has_basisu = true;
 
     return true;
@@ -329,7 +355,9 @@ TextureLoad::TextureLoad(const string& fileName) noexcept
     // Load in data from texture file
     uint8_t* imageData = nullptr;
     bytesPerChannel = 2;
-    int32_t width, height, channels;
+    int32_t width = 0;
+    int32_t height = 0;
+    int32_t channels = 0;
     if (stbi_is_16_bit(fileName.data()))
         imageData = reinterpret_cast<uint8_t*>(stbi_load_16(fileName.data(), &width, &height, &channels, 0));
     if (imageData == nullptr) {
@@ -340,9 +368,9 @@ TextureLoad::TextureLoad(const string& fileName) noexcept
         printError("Unable to load image '"s + fileName + "': " + stbi_failure_reason());
         return;
     }
-    imageWidth = width;
-    imageHeight = height;
-    channelCount = channels;
+    imageWidth = static_cast<uint32_t>(width);
+    imageHeight = static_cast<uint32_t>(height);
+    channelCount = static_cast<uint32_t>(channels);
     data = shared_ptr<uint8_t>(imageData, [](auto p) { stbi_image_free(p); });
 }
 

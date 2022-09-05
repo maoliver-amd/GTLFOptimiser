@@ -39,6 +39,8 @@ string_view getCGLTFError(const cgltf_result result, const shared_ptr<cgltf_data
             return data ? "Buffer too short"sv : "Unknown file type (not a GLTF file)"sv;
         case cgltf_result_unknown_format:
             return data ? "Unknown resource format"sv : "Unknown file type (not a GLTF file)"sv;
+        case cgltf_result_success:
+            return "Success"sv;
         default:
             return "Unknown error";
     }

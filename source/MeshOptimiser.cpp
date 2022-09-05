@@ -155,7 +155,7 @@ bool MeshOptimiser::passMeshes() noexcept
     for (size_t i = 0; i < dataCGLTF->meshes_count; ++i) {
         cgltf_mesh& mesh = dataCGLTF->meshes[i];
         for (cgltf_size j = 0; j < mesh.primitives_count; ++j) {
-            cgltf_primitive& prim = mesh.primitives[i];
+            cgltf_primitive& prim = mesh.primitives[j];
             if (prim.material != nullptr) {
                 validMaterials.insert(prim.material);
             }
@@ -190,9 +190,9 @@ void MeshOptimiser::removeMesh(cgltf_mesh* mesh) noexcept
     }
     for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
         cgltf_mesh* current = &dataCGLTF->meshes[i];
-        for (cgltf_size j = 0; j < mesh->primitives_count; ++j) {
-            cgltf_primitive& current = mesh->primitives[j];
-            if (auto pos = orphanedMaterials.find(current.material); pos != orphanedMaterials.end()) {
+        for (cgltf_size j = 0; j < current->primitives_count; ++j) {
+            cgltf_primitive& prim = current->primitives[j];
+            if (auto pos = orphanedMaterials.find(prim.material); pos != orphanedMaterials.end()) {
                 pos->second = true;
             }
         }
@@ -209,7 +209,7 @@ void MeshOptimiser::removeMesh(cgltf_mesh* mesh) noexcept
         if (current == mesh) {
             printWarning("Removed unused mesh: "s + ((current->name != nullptr) ? current->name : "unknown"));
             cgltf_remove_mesh(dataCGLTF.get(), current);
-            memmove(current, current + 1, (dataCGLTF->meshes_count - i - 1) * sizeof(cgltf_image));
+            memmove(current, current + 1, (dataCGLTF->meshes_count - i - 1) * sizeof(cgltf_mesh));
             --dataCGLTF->meshes_count;
             break;
         }
@@ -224,7 +224,7 @@ void MeshOptimiser::removeMaterial(cgltf_material* material) noexcept
         if (current == material) {
             printWarning("Removed unused material: "s + ((current->name != nullptr) ? current->name : "unknown"));
             cgltf_remove_material(dataCGLTF.get(), current);
-            memmove(current, current + 1, (dataCGLTF->materials_count - i - 1) * sizeof(cgltf_texture));
+            memmove(current, current + 1, (dataCGLTF->materials_count - i - 1) * sizeof(cgltf_material));
             --dataCGLTF->materials_count;
             break;
         }

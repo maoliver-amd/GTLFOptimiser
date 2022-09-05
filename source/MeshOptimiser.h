@@ -25,7 +25,7 @@ class MeshOptimiser
 public:
     MeshOptimiser(std::shared_ptr<cgltf_data>& data, const std::string& folder) noexcept;
 
-    [[nodisacrd]] bool passMeshes() noexcept;
+    [[nodiscard]] bool passMeshes() noexcept;
 
 private:
     void removeMesh(cgltf_mesh* mesh) noexcept;

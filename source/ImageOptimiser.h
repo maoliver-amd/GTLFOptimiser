@@ -23,9 +23,9 @@
 class ImageOptimiser
 {
 public:
-    ImageOptimiser(std::shared_ptr<cgltf_data>& data, const std::string& folder) noexcept;
+    ImageOptimiser(std::shared_ptr<cgltf_data>& data, const std::string& folder, bool keepOriginalTextures) noexcept;
 
-    [[nodisacrd]] bool passTextures() noexcept;
+    [[nodiscard]] bool passTextures() noexcept;
 
 private:
     void removeImage(cgltf_image* image) noexcept;
@@ -37,4 +37,5 @@ private:
     std::string rootFolder;
     std::shared_ptr<cgltf_data> dataCGLTF;
     std::map<cgltf_image*, bool> images;
+    bool keepTextures = false;
 };

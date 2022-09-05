@@ -33,9 +33,11 @@ int main(int argc, char* argv[])
     CLI::App app{"GLTF file optimiser"};
     app.set_version_flag("--version", std::string(SIG_VERSION_STR));
     string inputFile;
-    app.add_option("-i", inputFile, "The input GLTF file")->required();
+    app.add_option("-i,--input", inputFile, "The input GLTF file")->required();
     string outputFile;
-    app.add_option("-o", outputFile, "The output GLTF file")->default_str(inputFile);
+    app.add_option("-o,--output", outputFile, "The output GLTF file")->default_str(inputFile);
+    bool keepTextures = false;
+    app.add_flag("--kt", keepTextures, "Keep original uncompressed textures");
     CLI11_PARSE(app, argc, argv);
 
     // Open the GLTF file
@@ -68,10 +70,8 @@ int main(int argc, char* argv[])
     if (requiresGLTFExtension(dataCGLTF, "KHR_draco_mesh_compression")) {
         printError("Draco mesh compressions is not supported (input file uses KHR_draco_mesh_compression)"sv);
         return 1;
-    } else if (requiresGLTFExtension(dataCGLTF, "KHR_texture_basisu")) {
-        printError("Image compression is not supported (input file uses KHR_texture_basisu)"sv);
-        return 1;
-    } else if (requiresGLTFExtension(dataCGLTF, "EXT_mesh_gpu_instancing")) {
+    }
+    if (requiresGLTFExtension(dataCGLTF, "EXT_mesh_gpu_instancing")) {
         printError("Mesh instancing is not supported (input file uses EXT_mesh_gpu_instancing)"sv);
         return 1;
     }
@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
     }
 
     // Optimise images
-    ImageOptimiser imageOpt(dataCGLTF, imageFolder);
+    ImageOptimiser imageOpt(dataCGLTF, imageFolder, keepTextures);
     if (!imageOpt.passTextures()) {
         return 1;
     }
@@ -98,17 +98,13 @@ int main(int argc, char* argv[])
     // Write out updated gltf
     printInfo("Writing output gltf file: "s + outputFile);
     string_view generator = "GLTFOptimiser"sv;
-    auto newMem = static_cast<char*>(realloc(dataCGLTF->asset.generator, generator.size()));
+    auto newMem = realloc(dataCGLTF->asset.generator, generator.size() + 1);
     if (newMem == nullptr) {
         printError("Out of memory"sv);
         return false;
     }
-    dataCGLTF->asset.generator = newMem;
-    strcpy(dataCGLTF->asset.generator, generator.data());
-    string_view version = SIG_VERSION_STR;
-    newMem = static_cast<char*>(realloc(dataCGLTF->asset.version, version.size()));
-    dataCGLTF->asset.version = newMem;
-    strcpy(dataCGLTF->asset.version, version.data());
+    dataCGLTF->asset.generator = static_cast<char*>(newMem);
+    std::strcpy(dataCGLTF->asset.generator, generator.data());
     result = cgltf_write_file(&options, outputFile.c_str(), dataCGLTF.get());
     if (result != cgltf_result_success) {
         printError(getCGLTFError(result, dataCGLTF));
