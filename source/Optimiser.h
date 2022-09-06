@@ -45,7 +45,7 @@ private:
 
     void removeMaterial(cgltf_material* material, bool duplicate = false) noexcept;
 
-    bool convertTexture(cgltf_texture* texture, bool sRGB, bool split = false) noexcept;
+    bool convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap, bool split = false) noexcept;
 
     std::string rootFolder;
     std::shared_ptr<cgltf_data> dataCGLTF = nullptr;

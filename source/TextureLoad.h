@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
 
 class TextureLoad
 {
@@ -31,10 +31,15 @@ public:
 
     bool writeKTX(const std::string& fileName) noexcept;
 
+    bool isUniqueTexture() noexcept;
+
+    void convertTo8bit() noexcept;
+
     std::shared_ptr<uint8_t> data = nullptr;
     uint32_t imageWidth = 0;
     uint32_t imageHeight = 0;
     uint32_t channelCount = 0;
     uint32_t bytesPerChannel = 0;
     bool sRGB = false;
+    bool normalMap = false;
 };

@@ -54,7 +54,7 @@ bool Optimiser::passTextures() noexcept
     set<cgltf_texture*> validTextures;
     for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& material = dataCGLTF->materials[i];
-        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool = false) {
+        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool, bool = false) {
             if (p != nullptr) {
                 validTextures.insert(p);
             }
@@ -134,7 +134,7 @@ bool Optimiser::passTextures() noexcept
     // Update materials to remove duplicate textures
     for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& material = dataCGLTF->materials[i];
-        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool = false) {
+        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool, bool = false) {
             if (auto pos = textureDuplicates.find(p); pos != textureDuplicates.end()) {
                 p = pos->second;
             }
@@ -149,13 +149,14 @@ bool Optimiser::passTextures() noexcept
     // Convert all textures
     for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& material = dataCGLTF->materials[i];
-        runOverMaterialTextures(
-            material, [&](cgltf_texture*& p, bool sRGB, bool split = false) { convertTexture(p, sRGB, split); });
+        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool sRGB, bool normalMap, bool split = false) {
+            convertTexture(p, sRGB, normalMap, split);
+        });
     }
     return true;
 }
 
-bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool split) noexcept
+bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap, bool split) noexcept
 {
     // Check if has a valid image to convert
     if (texture == nullptr || (texture->image == nullptr && texture->basisu_image != nullptr)) {
@@ -181,6 +182,7 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool split) no
         return false;
     }
     imageData.sRGB = sRGB;
+    imageData.normalMap = normalMap;
 
     const size_t fileExt = imageFile.rfind('.');
     const string imageFileName = imageFile.substr(0, fileExt);
@@ -189,26 +191,39 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool split) no
     if (split) {
         printInfo("Splitting texture: "s + imageFile);
         // Assumes we only want to split when metallicity/roughness
-        if (imageData.channelCount != 2) {
+        uint32_t metalIndex = 2; // blue channel
+        uint32_t roughIndex = 1; // green channel
+        if (imageData.channelCount == 2) {
+            metalIndex = 0;
+            roughIndex = 1;
+        } else if (imageData.channelCount != 3 && imageData.channelCount != 4) {
             printError("Unexpected channel count when splitting texture '" + imageFile + "'");
+            return false;
         }
 
         // Split the files
-        TextureLoad imageDataMetal(imageData, 0);
-        const string metallicityFile = imageFileName + ".metallicity.ktx2";
-        if (!imageDataMetal.writeKTX(metallicityFile)) {
-            return false;
+        TextureLoad imageDataMetal(imageData, metalIndex);
+        if (imageDataMetal.isUniqueTexture()) {
+            const string metallicityFile = imageFileName + ".metallicity.ktx2";
+            if (!imageDataMetal.writeKTX(metallicityFile)) {
+                return false;
+            }
+        } else {
+            printWarning("Skipping output of redundant split metallicity texture '" + imageFile + "'");
         }
-        TextureLoad imageDataRough(imageData, 1);
-        const string roughnessFile = imageFileName + ".roughness.ktx2";
-        if (!imageDataRough.writeKTX(roughnessFile)) {
-            return false;
+        TextureLoad imageDataRough(imageData, roughIndex);
+        if (imageDataRough.isUniqueTexture()) {
+            const string roughnessFile = imageFileName + ".roughness.ktx2";
+            if (!imageDataRough.writeKTX(roughnessFile)) {
+                return false;
+            }
+        } else {
+            printWarning("Skipping output of redundant split roughness texture '" + imageFile + "'");
         }
-    } else {
-        string fileName = imageFileName + ".ktx2";
-        if (!imageData.writeKTX(fileName)) {
-            return false;
-        }
+    }
+    string fileName = imageFileName + ".ktx2";
+    if (!imageData.writeKTX(fileName)) {
+        return false;
     }
 
     // Set as converted

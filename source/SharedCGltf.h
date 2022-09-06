@@ -34,19 +34,22 @@ void runOverMaterialTextures(cgltf_material& material, Func function) noexcept
 {
     if (material.has_pbr_metallic_roughness) {
         cgltf_pbr_metallic_roughness& materialPBR = material.pbr_metallic_roughness;
-        function(materialPBR.base_color_texture.texture, true);
-        function(materialPBR.metallic_roughness_texture.texture, false, true);
+        function(materialPBR.base_color_texture.texture, true, false, false);
+        function(materialPBR.metallic_roughness_texture.texture, false, false, true);
     }
-    function(material.emissive_texture.texture, true);
-    function(material.normal_texture.texture, false);
-    function(material.occlusion_texture.texture, false);
-    function(material.specular.specular_color_texture.texture, true);
-    function(material.specular.specular_texture.texture, false);
-    function(material.clearcoat.clearcoat_normal_texture.texture, false);
-    function(material.clearcoat.clearcoat_roughness_texture.texture, false);
-    function(material.sheen.sheen_color_texture.texture, true);
-    function(material.sheen.sheen_roughness_texture.texture, false);
-    function(material.transmission.transmission_texture.texture, false);
+    function(material.emissive_texture.texture, true, false, false);
+    function(material.normal_texture.texture, false, true, false);
+    function(material.occlusion_texture.texture, false, false, false);
+    function(material.specular.specular_color_texture.texture, true, false, false);
+    function(material.specular.specular_texture.texture, false, false, false);
+    function(material.clearcoat.clearcoat_normal_texture.texture, false, true, false);
+    function(material.clearcoat.clearcoat_roughness_texture.texture, false, false, false);
+    function(material.sheen.sheen_color_texture.texture, true, false, false);
+    function(material.sheen.sheen_roughness_texture.texture, false, false, false);
+    function(material.transmission.transmission_texture.texture, false, false, false);
+    function(material.pbr_specular_glossiness.diffuse_texture.texture, false, false, false);
+    function(material.pbr_specular_glossiness.specular_glossiness_texture.texture, false, false, false);
+    function(material.volume.thickness_texture.texture, false, false, false);
 }
 
 extern void cgltf_free_extensions(cgltf_data* data, cgltf_extension* extensions, cgltf_size extensions_count);

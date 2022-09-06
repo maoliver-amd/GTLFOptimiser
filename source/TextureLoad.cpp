@@ -19,6 +19,7 @@
 
 #include "Shared.h"
 
+#include <array>
 #include <ktx.h>
 #include <stb_image.h>
 #include <thread>
@@ -57,42 +58,43 @@ TextureLoad::TextureLoad(const TextureLoad& other, uint32_t channel) noexcept
     data = shared_ptr<uint8_t>(static_cast<stbi_uc*>(malloc(imageSize)), [](auto p) { stbi_image_free(p); });
     imageWidth = other.imageWidth;
     imageHeight = other.imageHeight;
-    channelCount = other.channelCount;
+    channelCount = 1;
     bytesPerChannel = other.bytesPerChannel;
-    if (other.bytesPerChannel == 1) {
-        uint8_t* sourceData = other.data.get();
+    auto unpack = [&]<typename T>(T* sourceData) {
         for (size_t y = 0; y < imageHeight; ++y) {
             for (size_t x = 0; x < imageWidth; ++x) {
-                for (size_t k = 0; k < channelCount; ++k) {
-                    if (k == channel) {
-                        const size_t destIndex = (x + y * imageWidth);
-                        const size_t sourceIndex = channelCount * (x + y * imageWidth) + k;
-                        const uint8_t source = sourceData[sourceIndex];
-                        data.get()[destIndex] = source;
-                    }
-                }
-            }
-        }
-    } else {
-        uint16_t* sourceData = (uint16_t*)other.data.get();
-        for (size_t y = 0; y < imageHeight; ++y) {
-            for (size_t x = 0; x < imageWidth; ++x) {
-                for (size_t k = 0; k < channelCount; ++k) {
+                for (size_t k = 0; k < other.channelCount; ++k) {
                     if (k == channel) {
                         const size_t destIndex = (x + y * imageWidth);
                         const size_t sourceIndex = other.channelCount * (x + y * imageWidth) + k;
-                        const uint16_t source = sourceData[sourceIndex];
-                        reinterpret_cast<uint16_t*>(data.get())[destIndex] = source;
+                        const T source = sourceData[sourceIndex];
+                        reinterpret_cast<T*>(data.get())[destIndex] = source;
                     }
                 }
             }
         }
+    };
+    if (other.bytesPerChannel == 1) {
+        uint8_t* sourceData = reinterpret_cast<uint8_t*>(other.data.get());
+        unpack(sourceData);
+    } else if (other.bytesPerChannel == 2) {
+        uint16_t* sourceData = reinterpret_cast<uint16_t*>(other.data.get());
+        unpack(sourceData);
+    } else if (other.bytesPerChannel == 4) {
+        uint32_t* sourceData = reinterpret_cast<uint32_t*>(other.data.get());
+        unpack(sourceData);
     }
 }
 
 bool TextureLoad::writeKTX(const string& fileName) noexcept
 {
     printInfo("Writing compressed texture: "s + fileName);
+
+    // Check if texture is in a supported format
+    if (bytesPerChannel != 1) {
+        printWarning("Converting image to 8bit '"s + fileName + "'");
+        convertTo8bit();
+    }
 
     // Initialise data describing the new texture
     ktxTextureCreateInfo createInfo = {0};
@@ -122,7 +124,7 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
     createInfo.numLayers = 1;
     createInfo.numFaces = 1;
     createInfo.isArray = KTX_FALSE;
-    createInfo.generateMipmaps = KTX_TRUE;
+    createInfo.generateMipmaps = KTX_FALSE;
 
     KTX_error_code result = KTX_SUCCESS;
     shared_ptr<ktxTexture2> texture(
@@ -154,6 +156,8 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
     params.uastcRDO = true;
     params.uastcRDOQualityScalar = 1.0f;
     params.threadCount = thread::hardware_concurrency();
+    // params.normalMap = normalMap; //Converts to 2 channel compressed (loading such textures is not currently
+    // supported)
     result = ktxTexture2_CompressBasisEx(texture.get(), &params);
     if (result != KTX_SUCCESS) {
         printError("Failed encoding ktx texture '"s + fileName + "'" + ": " + ktxErrorString(result));
@@ -174,4 +178,71 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
         return false;
     }
     return true;
+}
+
+bool TextureLoad::isUniqueTexture() noexcept
+{
+    // Check if all texels are identical
+    auto func = [&]<typename T>(T* sourceData) {
+        std::array<T, 4> check = {0};
+        for (size_t k = 0; k < channelCount; ++k) {
+            check[k] = sourceData[k];
+        }
+        for (size_t y = 0; y < imageHeight; ++y) {
+            for (size_t x = 0; x < imageWidth; ++x) {
+                for (size_t k = 0; k < channelCount; ++k) {
+                    const size_t sourceIndex = channelCount * (x + y * imageWidth) + k;
+                    if (check[k] != sourceData[sourceIndex]) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+    if (bytesPerChannel == 1) {
+        uint8_t* sourceData = data.get();
+        return func(sourceData);
+    } else if (bytesPerChannel == 2) {
+        uint16_t* sourceData = reinterpret_cast<uint16_t*>(data.get());
+        return func(sourceData);
+    } else if (bytesPerChannel == 4) {
+        uint32_t* sourceData = reinterpret_cast<uint32_t*>(data.get());
+        return func(sourceData);
+    }
+    return false;
+}
+
+void TextureLoad::convertTo8bit() noexcept
+{
+    // Check if conversion is needed
+    if (bytesPerChannel == 1) {
+        return;
+    }
+
+    // Convert internal data to 8bit
+    const size_t imageSize = (size_t)imageWidth * imageHeight * channelCount;
+    std::shared_ptr<uint8_t> newData =
+        shared_ptr<uint8_t>(static_cast<stbi_uc*>(malloc(imageSize)), [](auto p) { free(p); });
+    auto convert = [&]<typename T>(T* sourceData) {
+        for (size_t y = 0; y < imageHeight; ++y) {
+            for (size_t x = 0; x < imageWidth; ++x) {
+                for (size_t k = 0; k < channelCount; ++k) {
+                    const size_t sourceIndex = channelCount * (x + y * imageWidth) + k;
+                    const T source = sourceData[sourceIndex];
+                    newData.get()[sourceIndex] =
+                        static_cast<uint8_t>(source / (256 * (sizeof(T) == sizeof(uint16_t) ? 1 : 256)));
+                }
+            }
+        }
+    };
+    if (bytesPerChannel == 2) {
+        uint16_t* sourceData = reinterpret_cast<uint16_t*>(data.get());
+        convert(sourceData);
+    } else if (bytesPerChannel == 4) {
+        uint32_t* sourceData = reinterpret_cast<uint32_t*>(data.get());
+        convert(sourceData);
+    }
+    swap(data, newData);
+    bytesPerChannel = 1;
 }

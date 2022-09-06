@@ -142,7 +142,7 @@ void Optimiser::removeTexture(cgltf_texture* texture, bool duplicate) noexcept
         // Loop through all materials and set any matching pointers to null
         for (cgltf_size j = 0; j < dataCGLTF->materials_count; ++j) {
             cgltf_material& current = dataCGLTF->materials[j];
-            runOverMaterialTextures(current, [&](cgltf_texture*& p, bool, bool = false) {
+            runOverMaterialTextures(current, [&](cgltf_texture*& p, bool, bool, bool = false) {
                 if (p == texture) {
                     p = nullptr;
                 }
@@ -154,7 +154,7 @@ void Optimiser::removeTexture(cgltf_texture* texture, bool duplicate) noexcept
     cgltf_texture* current = &dataCGLTF->textures[texPos];
     for (cgltf_size k = 0; k < dataCGLTF->materials_count; ++k) {
         cgltf_material& material = dataCGLTF->materials[k];
-        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool = false) {
+        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool, bool = false) {
             if (p >= current + 1) {
                 p = p - 1;
             }
@@ -233,14 +233,14 @@ void Optimiser::removeMaterial(cgltf_material* material, bool duplicate) noexcep
 {
     // Check for orphaned textures
     map<cgltf_texture*, bool> orphanedTextures;
-    runOverMaterialTextures(*material, [&](cgltf_texture*& p, bool, bool = false) {
+    runOverMaterialTextures(*material, [&](cgltf_texture*& p, bool, bool, bool = false) {
         if (p != nullptr) {
             orphanedTextures.emplace(p, false);
         }
     });
     for (cgltf_size i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& current = dataCGLTF->materials[i];
-        runOverMaterialTextures(current, [&](cgltf_texture*& p, bool, bool = false) {
+        runOverMaterialTextures(current, [&](cgltf_texture*& p, bool, bool, bool = false) {
             if (auto pos = orphanedTextures.find(p); pos != orphanedTextures.end()) {
                 pos->second = true;
             }
