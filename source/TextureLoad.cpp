@@ -22,6 +22,7 @@
 #include <array>
 #include <ktx.h>
 #include <stb_image.h>
+#include <stb_image_resize.h>
 #include <thread>
 #include <vulkan/vulkan_core.h>
 
@@ -86,15 +87,37 @@ TextureLoad::TextureLoad(const TextureLoad& other, uint32_t channel) noexcept
     }
 }
 
+TextureLoad::TextureLoad(uint32_t width, uint32_t height, uint32_t channels, uint32_t bytes) noexcept
+    : imageWidth(width)
+    , imageHeight(height)
+    , channelCount(channels)
+    , bytesPerChannel(bytes)
+{
+    data = shared_ptr<uint8_t>(static_cast<uint8_t*>(malloc(getSize())), [](auto p) { free(p); });
+}
+
 bool TextureLoad::writeKTX(const string& fileName) noexcept
 {
-    printInfo("Writing compressed texture: "s + fileName);
-
     // Check if texture is in a supported format
     if (bytesPerChannel != 1) {
         printWarning("Converting image to 8bit '"s + fileName + "'");
-        convertTo8bit();
+        if (!convertTo8bit()) {
+            return false;
+        }
     }
+
+    if (normalMap && channelCount >= 3) {
+        printInfo("Normalising image data '"s + fileName + "'");
+        // Normalise all data
+        if (!normalise()) {
+            return false;
+        }
+    }
+
+    printInfo("Writing compressed texture: "s + fileName);
+    // Check number of required mips for full pyramid
+    uint32_t maxSize = std::max(imageWidth, imageHeight);
+    uint32_t numLevels = std::max(bit_width(maxSize), 1U);
 
     // Initialise data describing the new texture
     ktxTextureCreateInfo createInfo = {0};
@@ -120,7 +143,7 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
     createInfo.baseHeight = imageHeight;
     createInfo.baseDepth = 1;
     createInfo.numDimensions = 2;
-    createInfo.numLevels = 1;
+    createInfo.numLevels = numLevels;
     createInfo.numLayers = 1;
     createInfo.numFaces = 1;
     createInfo.isArray = KTX_FALSE;
@@ -141,11 +164,48 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
     }
 
     // Copy across existing image data into ktx texture
-    size_t const imageSize = (size_t)imageWidth * imageHeight * channelCount * bytesPerChannel;
-    result = ktxTexture_SetImageFromMemory((ktxTexture*)texture.get(), 0, 0, 0, data.get(), imageSize);
+    result = ktxTexture_SetImageFromMemory(ktxTexture(texture.get()), 0, 0, 0, data.get(), getSize());
     if (result != KTX_SUCCESS) {
         printError("Failed initialising ktx texture '"s + fileName + "'" + ": " + ktxErrorString(result));
         return false;
+    }
+
+    // Generate the mip maps
+    for (uint32_t mip = 1; mip < createInfo.numLevels; ++mip) {
+        // Resize image
+        TextureLoad mipTexture(
+            std::max(imageWidth >> mip, 1U), std::max(imageHeight >> mip, 1U), channelCount, bytesPerChannel);
+        if (mipTexture.data.get() == nullptr) {
+            printError("Out of memory"sv);
+            return false;
+        }
+        stbir_datatype dataType = (bytesPerChannel == 1) ? STBIR_TYPE_UINT8 :
+            (bytesPerChannel == 2)                       ? STBIR_TYPE_UINT16 :
+                                                           STBIR_TYPE_UINT32;
+        stbir_colorspace colourSpace = sRGB ? STBIR_COLORSPACE_SRGB : STBIR_COLORSPACE_LINEAR;
+        int alphaChannel = (channelCount == 4) ? 3 : STBIR_ALPHA_CHANNEL_NONE;
+        int res = stbir_resize(data.get(), imageWidth, imageHeight, 0, mipTexture.data.get(), mipTexture.imageWidth,
+            mipTexture.imageHeight, 0, dataType, channelCount, alphaChannel, 0, STBIR_EDGE_CLAMP, STBIR_EDGE_CLAMP,
+            STBIR_FILTER_MITCHELL, STBIR_FILTER_MITCHELL, colourSpace, nullptr);
+        if (res != 1) {
+            printError("Failed generating ktx texture mip '"s + fileName + "'");
+            return false;
+        }
+
+        if (normalMap && channelCount >= 3) {
+            // Normalise all data
+            if (!mipTexture.normalise()) {
+                return false;
+            }
+        }
+
+        // Copy across memory
+        result = ktxTexture_SetImageFromMemory(
+            ktxTexture(texture.get()), mip, 0, 0, mipTexture.data.get(), mipTexture.getSize());
+        if (result != KTX_SUCCESS) {
+            printError("Failed setting ktx texture mip '"s + fileName + "'" + ": " + ktxErrorString(result));
+            return false;
+        }
     }
 
     // Apply basisu compression on the texture
@@ -157,7 +217,11 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
     params.uastcRDOQualityScalar = 1.0f;
     params.threadCount = thread::hardware_concurrency();
     // params.normalMap = normalMap; //Converts to 2 channel compressed (loading such textures is not currently
-    // supported)
+    //  supported) so we do the below instead
+    if (normalMap) {
+        params.noEndpointRDO = true;
+        params.noSelectorRDO = true;
+    }
     result = ktxTexture2_CompressBasisEx(texture.get(), &params);
     if (result != KTX_SUCCESS) {
         printError("Failed encoding ktx texture '"s + fileName + "'" + ": " + ktxErrorString(result));
@@ -213,17 +277,21 @@ bool TextureLoad::isUniqueTexture() noexcept
     return false;
 }
 
-void TextureLoad::convertTo8bit() noexcept
+bool TextureLoad::convertTo8bit() noexcept
 {
     // Check if conversion is needed
     if (bytesPerChannel == 1) {
-        return;
+        return true;
     }
 
     // Convert internal data to 8bit
     const size_t imageSize = (size_t)imageWidth * imageHeight * channelCount;
     std::shared_ptr<uint8_t> newData =
         shared_ptr<uint8_t>(static_cast<stbi_uc*>(malloc(imageSize)), [](auto p) { free(p); });
+    if (newData.get() == nullptr) {
+        printError("Out of memory"sv);
+        return false;
+    }
     auto convert = [&]<typename T>(T* sourceData) {
         for (size_t y = 0; y < imageHeight; ++y) {
             for (size_t x = 0; x < imageWidth; ++x) {
@@ -245,4 +313,77 @@ void TextureLoad::convertTo8bit() noexcept
     }
     swap(data, newData);
     bytesPerChannel = 1;
+    return true;
+}
+
+bool TextureLoad::normalise() noexcept
+{
+    // Assumes either 3 or 4 channel
+    if (channelCount < 3) {
+        return false;
+    }
+
+    std::shared_ptr<uint8_t> outData = data;
+    if (channelCount == 4) {
+        // Need to remove the 4th channel so create new scratch memory
+        size_t size = static_cast<size_t>(imageWidth) * imageHeight * 3 * bytesPerChannel;
+        outData = std::shared_ptr<uint8_t>(static_cast<uint8_t*>(malloc(size)), [](auto p) { free(p); });
+        if (outData.get() == nullptr) {
+            printError("Out of memory"sv);
+            return false;
+        }
+    }
+
+    auto func = [&]<typename T>(T* sourceData, T* destData) {
+        std::array<T, 3> pixel = {0};
+        for (size_t y = 0; y < imageHeight; ++y) {
+            for (size_t x = 0; x < imageWidth; ++x) {
+                for (size_t k = 0; k < 3; ++k) {
+                    const size_t sourceIndex = channelCount * (x + y * imageWidth) + k;
+                    pixel[k] = sourceData[sourceIndex];
+                }
+                // Normalise pixel value
+                constexpr float scale = static_cast<float>(numeric_limits<T>::max());
+                float r = static_cast<float>(pixel[0]) / scale;
+                float g = static_cast<float>(pixel[1]) / scale;
+                float b = static_cast<float>(pixel[2]) / scale;
+                float norm = sqrtf((r * r) + (g * g) + (b * b));
+                r /= norm;
+                g /= norm;
+                b /= norm;
+                pixel[0] = static_cast<T>(r * scale);
+                pixel[1] = static_cast<T>(g * scale);
+                pixel[2] = static_cast<T>(b * scale);
+                for (size_t k = 0; k < 3; ++k) {
+                    const size_t sourceIndex = channelCount * (x + y * imageWidth) + k;
+                    destData[sourceIndex] = pixel[k];
+                }
+            }
+        }
+    };
+    if (bytesPerChannel == 1) {
+        uint8_t* sourceData = data.get();
+        uint8_t* destData = outData.get();
+        func(sourceData, destData);
+    } else if (bytesPerChannel == 2) {
+        uint16_t* sourceData = reinterpret_cast<uint16_t*>(data.get());
+        uint16_t* destData = reinterpret_cast<uint16_t*>(outData.get());
+        func(sourceData, destData);
+    } else if (bytesPerChannel == 4) {
+        uint32_t* sourceData = reinterpret_cast<uint32_t*>(data.get());
+        uint32_t* destData = reinterpret_cast<uint32_t*>(outData.get());
+        func(sourceData, destData);
+    }
+
+    if (outData != data) {
+        // Swap in new data
+        swap(outData, data);
+    }
+    return true;
+}
+
+size_t TextureLoad::getSize() noexcept
+{
+    size_t size = static_cast<size_t>(imageWidth) * imageHeight * channelCount * bytesPerChannel;
+    return size;
 }

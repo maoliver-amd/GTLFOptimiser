@@ -25,6 +25,8 @@ public:
 
     TextureLoad(const TextureLoad& other, uint32_t channel) noexcept;
 
+    TextureLoad(uint32_t width, uint32_t height, uint32_t channels, uint32_t bytes) noexcept;
+
     TextureLoad() = delete;
 
     ~TextureLoad() noexcept = default;
@@ -33,7 +35,11 @@ public:
 
     bool isUniqueTexture() noexcept;
 
-    void convertTo8bit() noexcept;
+    bool convertTo8bit() noexcept;
+
+    bool normalise() noexcept;
+
+    size_t getSize() noexcept;
 
     std::shared_ptr<uint8_t> data = nullptr;
     uint32_t imageWidth = 0;
