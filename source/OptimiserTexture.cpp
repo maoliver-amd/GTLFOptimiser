@@ -260,10 +260,10 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         *newImage = {0};
         string_view basisu = "/basisu"sv;
         size_t nameLength = strlen(image->name);
-        newImage->name = static_cast<char*>(malloc(nameLength + 1 + basisu.length()));
+        newImage->name = static_cast<char*>(malloc(nameLength + basisu.length() + 1));
         if (newImage->name != nullptr) {
             memcpy(newImage->name, image->name, nameLength);
-            memcpy(newImage->name + nameLength + 1, basisu.data(), basisu.length());
+            memcpy(newImage->name + nameLength, basisu.data(), basisu.length() + 1);
         }
         ++dataCGLTF->images_count;
     } else {
