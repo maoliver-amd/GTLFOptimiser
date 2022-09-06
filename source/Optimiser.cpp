@@ -18,6 +18,7 @@
 
 #include "Shared.h"
 #include "SharedCGLTF.h"
+#include "Version.h"
 
 #include <cgltf.h>
 #include <cgltf_write.h>
@@ -91,7 +92,7 @@ bool Optimiser::pass(const std::string& inputFile, const std::string& outputFile
 
     // Write out updated gltf
     printInfo("Writing output gltf file: "s + outputFile);
-    string_view generator = "GLTFOptimiser"sv;
+    string_view generator = "GLTFOptimiser (" SIG_VERSION_STR ")";
     auto newMem = realloc(dataCGLTF->asset.generator, generator.size() + 1);
     if (newMem == nullptr) {
         printError("Out of memory"sv);
