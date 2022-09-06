@@ -14,18 +14,90 @@
  * limitations under the License.
  */
 
-#include "MeshOptimiser.h"
+#include "SharedCGLTF.h"
 
-#include "Shared.h"
-
-#include <map>
-#include <set>
+#include <iostream>
 
 using namespace std;
 
-extern void cgltf_free_extensions(cgltf_data* data, cgltf_extension* extensions, cgltf_size extensions_count);
+string_view getCGLTFError(const cgltf_result result, const shared_ptr<cgltf_data>& data) noexcept
+{
+    switch (result) {
+        case cgltf_result_file_not_found:
+            return data ? "Resource not found"sv : "File not found"sv;
+        case cgltf_result_io_error:
+            return "I/O error"sv;
+        case cgltf_result_invalid_json:
+            return "Invalid JSON"sv;
+        case cgltf_result_invalid_gltf:
+            return "Invalid GLTF"sv;
+        case cgltf_result_out_of_memory:
+            return "Out of memory"sv;
+        case cgltf_result_legacy_gltf:
+            return "Legacy GLTF"sv;
+        case cgltf_result_data_too_short:
+            return data ? "Buffer too short"sv : "Unknown file type (not a GLTF file)"sv;
+        case cgltf_result_unknown_format:
+            return data ? "Unknown resource format"sv : "Unknown file type (not a GLTF file)"sv;
+        case cgltf_result_success:
+            return "Success"sv;
+        default:
+            return "Unknown error";
+    }
+}
 
-static void cgltf_remove_mesh(cgltf_data* data, cgltf_mesh* mesh)
+bool requiresGLTFExtension(const shared_ptr<cgltf_data>& data, const string_view& name) noexcept
+{
+    for (size_t i = 0; i < data->extensions_required_count; ++i) {
+        if (strcmp(data->extensions_required[i], name.data()) == 0)
+            return true;
+    }
+    return false;
+}
+
+bool operator==(const cgltf_image& a, const cgltf_image& b) noexcept
+{
+    if (a.uri == b.uri && a.uri != nullptr) {
+        return true;
+    } else if (a.buffer_view == b.buffer_view && a.buffer_view != nullptr) {
+        return true;
+    }
+    return false;
+}
+
+bool operator==(const cgltf_texture& a, const cgltf_texture& b) noexcept
+{
+    if (((a.image == b.image && a.image != nullptr) || a.basisu_image == b.basisu_image && a.basisu_image != nullptr) &&
+        a.sampler == b.sampler) {
+        return true;
+    }
+    return false;
+}
+
+bool operator==(const cgltf_material& a, const cgltf_material& b) noexcept
+{
+    if (memcmp(&a.pbr_metallic_roughness, &b.pbr_metallic_roughness, sizeof(cgltf_pbr_metallic_roughness)) == 0 &&
+        memcmp(&a.pbr_specular_glossiness, &b.pbr_specular_glossiness, sizeof(cgltf_pbr_specular_glossiness)) == 0 &&
+        memcmp(&a.clearcoat, &b.clearcoat, sizeof(cgltf_clearcoat)) == 0 &&
+        memcmp(&a.ior, &b.ior, sizeof(cgltf_ior)) == 0 &&
+        memcmp(&a.specular, &b.specular, sizeof(cgltf_specular)) == 0 &&
+        memcmp(&a.sheen, &b.sheen, sizeof(cgltf_sheen)) == 0 &&
+        memcmp(&a.transmission, &b.transmission, sizeof(cgltf_transmission)) == 0 &&
+        memcmp(&a.volume, &b.volume, sizeof(cgltf_volume)) == 0 &&
+        memcmp(&a.normal_texture, &b.normal_texture, sizeof(cgltf_texture_view)) == 0 &&
+        memcmp(&a.occlusion_texture, &b.occlusion_texture, sizeof(cgltf_texture_view)) == 0 &&
+        memcmp(&a.emissive_texture, &b.emissive_texture, sizeof(cgltf_texture_view)) == 0 &&
+        memcmp(&a.emissive_factor, &b.emissive_factor, sizeof(cgltf_float) * 3) == 0 &&
+        memcmp(&a.alpha_mode, &b.alpha_mode, sizeof(cgltf_alpha_mode)) == 0 &&
+        memcmp(&a.alpha_cutoff, &b.alpha_cutoff, sizeof(cgltf_float)) == 0 &&
+        memcmp(&a.double_sided, &b.double_sided, sizeof(cgltf_bool)) == 0 &&
+        memcmp(&a.unlit, &b.unlit, sizeof(cgltf_bool)) == 0) {
+        return true;
+    }
+    return false;
+}
+
+void cgltf_remove_mesh(cgltf_data* data, cgltf_mesh* mesh) noexcept
 {
     data->memory.free(data->memory.user_data, mesh->name);
 
@@ -72,7 +144,7 @@ static void cgltf_remove_mesh(cgltf_data* data, cgltf_mesh* mesh)
     data->memory.free(data->memory.user_data, mesh->target_names);
 }
 
-static void cgltf_remove_material(cgltf_data* data, cgltf_material* material)
+void cgltf_remove_material(cgltf_data* data, cgltf_material* material) noexcept
 {
     data->memory.free(data->memory.user_data, material->name);
 
@@ -124,120 +196,17 @@ static void cgltf_remove_material(cgltf_data* data, cgltf_material* material)
     cgltf_free_extensions(data, material->extensions, material->extensions_count);
 }
 
-MeshOptimiser::MeshOptimiser(shared_ptr<cgltf_data>& data, const std::string& folder) noexcept
-    : dataCGLTF(data)
-    , rootFolder(folder)
+void cgltf_remove_image(cgltf_data* data, cgltf_image* image) noexcept
 {
-    if (!rootFolder.empty() && rootFolder.back() != '/' && rootFolder.back() != '\\') {
-        rootFolder += '/';
-    }
+    data->memory.free(data->memory.user_data, image->name);
+    data->memory.free(data->memory.user_data, image->uri);
+    data->memory.free(data->memory.user_data, image->mime_type);
+
+    cgltf_free_extensions(data, image->extensions, image->extensions_count);
 }
 
-bool MeshOptimiser::passMeshes() noexcept
+void cgltf_remove_texture(cgltf_data* data, cgltf_texture* texture) noexcept
 {
-    // Loop through all nodes and check for unused meshes
-    set<cgltf_mesh*> removedMeshes;
-    for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
-        cgltf_mesh& mesh = dataCGLTF->meshes[i];
-        if (mesh.primitives_count == 0) {
-            removedMeshes.insert(&mesh);
-            continue;
-        }
-    }
-
-    // Remove any found invalid meshes
-    for (auto& i : removedMeshes) {
-        removeMesh(i);
-    }
-
-    // Loop through all meshes and check for unused materials
-    set<cgltf_material*> validMaterials;
-    for (size_t i = 0; i < dataCGLTF->meshes_count; ++i) {
-        cgltf_mesh& mesh = dataCGLTF->meshes[i];
-        for (cgltf_size j = 0; j < mesh.primitives_count; ++j) {
-            cgltf_primitive& prim = mesh.primitives[j];
-            if (prim.material != nullptr) {
-                validMaterials.insert(prim.material);
-            }
-        }
-    }
-    set<cgltf_material*> removedMaterials;
-    for (cgltf_size i = 0; i < dataCGLTF->materials_count; ++i) {
-        cgltf_material* material = &dataCGLTF->materials[i];
-        if (!validMaterials.contains(material)) {
-            removedMaterials.insert(material);
-        }
-    }
-
-    // Remove any found invalid materials
-    for (auto& i : removedMaterials) {
-        removeMaterial(i);
-    }
-
-    // TODO: optimise meshes
-    return true;
-}
-
-void MeshOptimiser::removeMesh(cgltf_mesh* mesh) noexcept
-{
-    // Check for orphaned materials
-    map<cgltf_material*, bool> orphanedMaterials;
-    for (cgltf_size i = 0; i < mesh->primitives_count; ++i) {
-        cgltf_primitive& current = mesh->primitives[i];
-        if (current.material != nullptr) {
-            orphanedMaterials.emplace(current.material, false);
-        }
-    }
-    for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
-        cgltf_mesh* current = &dataCGLTF->meshes[i];
-        for (cgltf_size j = 0; j < current->primitives_count; ++j) {
-            cgltf_primitive& prim = current->primitives[j];
-            if (auto pos = orphanedMaterials.find(prim.material); pos != orphanedMaterials.end()) {
-                pos->second = true;
-            }
-        }
-    }
-    for (auto& i : orphanedMaterials) {
-        if (!i.second) {
-            removeMaterial(i.first);
-        }
-    }
-
-    // Remove the mesh from the meshes list
-    for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
-        cgltf_mesh* current = &dataCGLTF->meshes[i];
-        if (current == mesh) {
-            printWarning("Removed unused mesh: "s + ((current->name != nullptr) ? current->name : "unknown"));
-            cgltf_remove_mesh(dataCGLTF.get(), current);
-            memmove(current, current + 1, (dataCGLTF->meshes_count - i - 1) * sizeof(cgltf_mesh));
-            --dataCGLTF->meshes_count;
-            break;
-        }
-    }
-}
-
-void MeshOptimiser::removeMaterial(cgltf_material* material) noexcept
-{
-    // Remove the material from the materials list
-    for (cgltf_size i = 0; i < dataCGLTF->materials_count; ++i) {
-        cgltf_material* current = &dataCGLTF->materials[i];
-        if (current == material) {
-            printWarning("Removed unused material: "s + ((current->name != nullptr) ? current->name : "unknown"));
-            cgltf_remove_material(dataCGLTF.get(), current);
-            memmove(current, current + 1, (dataCGLTF->materials_count - i - 1) * sizeof(cgltf_material));
-            --dataCGLTF->materials_count;
-            break;
-        }
-    }
-
-    // Loop through all primitives and set any matching pointers to null
-    for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
-        cgltf_mesh& mesh = dataCGLTF->meshes[i];
-        for (cgltf_size j = 0; j < mesh.primitives_count; ++j) {
-            cgltf_primitive& prim = mesh.primitives[j];
-            if (prim.material == material) {
-                prim.material = nullptr;
-            }
-        }
-    }
+    data->memory.free(data->memory.user_data, texture->name);
+    cgltf_free_extensions(data, texture->extensions, texture->extensions_count);
 }

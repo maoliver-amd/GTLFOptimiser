@@ -15,23 +15,26 @@
  */
 #pragma once
 
-#include <cgltf.h>
-#include <map>
+#include <string>
 #include <memory>
-#include <string_view>
 
-class MeshOptimiser
+class TextureLoad
 {
 public:
-    MeshOptimiser(std::shared_ptr<cgltf_data>& data, const std::string& folder) noexcept;
+    TextureLoad(const std::string& fileName) noexcept;
 
-    [[nodiscard]] bool passMeshes() noexcept;
+    TextureLoad(const TextureLoad& other, uint32_t channel) noexcept;
 
-private:
-    void removeMesh(cgltf_mesh* mesh) noexcept;
+    TextureLoad() = delete;
 
-    void removeMaterial(cgltf_material* material) noexcept;
+    ~TextureLoad() noexcept = default;
 
-    std::string rootFolder;
-    std::shared_ptr<cgltf_data> dataCGLTF;
+    bool writeKTX(const std::string& fileName) noexcept;
+
+    std::shared_ptr<uint8_t> data = nullptr;
+    uint32_t imageWidth = 0;
+    uint32_t imageHeight = 0;
+    uint32_t channelCount = 0;
+    uint32_t bytesPerChannel = 0;
+    bool sRGB = false;
 };

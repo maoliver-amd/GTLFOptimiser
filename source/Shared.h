@@ -15,13 +15,8 @@
  */
 #pragma once
 
-#include <cgltf.h>
-#include <string_view>
 #include <memory>
-
-std::string_view getCGLTFError(const cgltf_result result, const std::shared_ptr<cgltf_data>& data) noexcept;
-
-bool requiresGLTFExtension(const std::shared_ptr<cgltf_data>& data, const std::string_view& name) noexcept;
+#include <string_view>
 
 void printError(const std::string_view& message) noexcept;
 

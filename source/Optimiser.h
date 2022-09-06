@@ -18,24 +18,37 @@
 #include <cgltf.h>
 #include <map>
 #include <memory>
-#include <string_view>
+#include <string>
 
-class ImageOptimiser
+class Optimiser
 {
 public:
-    ImageOptimiser(std::shared_ptr<cgltf_data>& data, const std::string& folder, bool keepOriginalTextures) noexcept;
+    struct Options
+    {
+        bool keepOriginalTextures = false;
+    };
 
-    [[nodiscard]] bool passTextures() noexcept;
+    Optimiser(const Options& opts) noexcept;
+
+    [[nodiscard]] bool pass(const std::string& inputFile, const std::string& outputFile) noexcept;
 
 private:
-    void removeImage(cgltf_image* image) noexcept;
+    [[nodiscard]] bool passTextures() noexcept;
 
-    void removeTexture(cgltf_texture* texture) noexcept;
+    [[nodiscard]] bool passMeshes() noexcept;
+
+    void removeImage(cgltf_image* image, bool duplicate = false) noexcept;
+
+    void removeTexture(cgltf_texture* texture, bool duplicate = false) noexcept;
+
+    void removeMesh(cgltf_mesh* mesh, bool duplicate = false) noexcept;
+
+    void removeMaterial(cgltf_material* material, bool duplicate = false) noexcept;
 
     bool convertTexture(cgltf_texture* texture, bool sRGB, bool split = false) noexcept;
 
     std::string rootFolder;
-    std::shared_ptr<cgltf_data> dataCGLTF;
+    std::shared_ptr<cgltf_data> dataCGLTF = nullptr;
     std::map<cgltf_image*, bool> images;
-    bool keepTextures = false;
+    Options options;
 };

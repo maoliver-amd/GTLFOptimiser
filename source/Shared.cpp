@@ -20,41 +20,6 @@
 
 using namespace std;
 
-string_view getCGLTFError(const cgltf_result result, const shared_ptr<cgltf_data>& data) noexcept
-{
-    switch (result) {
-        case cgltf_result_file_not_found:
-            return data ? "Resource not found"sv : "File not found"sv;
-        case cgltf_result_io_error:
-            return "I/O error"sv;
-        case cgltf_result_invalid_json:
-            return "Invalid JSON"sv;
-        case cgltf_result_invalid_gltf:
-            return "Invalid GLTF"sv;
-        case cgltf_result_out_of_memory:
-            return "Out of memory"sv;
-        case cgltf_result_legacy_gltf:
-            return "Legacy GLTF"sv;
-        case cgltf_result_data_too_short:
-            return data ? "Buffer too short"sv : "Unknown file type (not a GLTF file)"sv;
-        case cgltf_result_unknown_format:
-            return data ? "Unknown resource format"sv : "Unknown file type (not a GLTF file)"sv;
-        case cgltf_result_success:
-            return "Success"sv;
-        default:
-            return "Unknown error";
-    }
-}
-
-bool requiresGLTFExtension(const shared_ptr<cgltf_data>& data, const string_view& name) noexcept
-{
-    for (size_t i = 0; i < data->extensions_required_count; ++i) {
-        if (strcmp(data->extensions_required[i], name.data()) == 0)
-            return true;
-    }
-    return false;
-}
-
 void printError(const std::string_view& message) noexcept
 {
     cout << "Error: " << message << endl;
