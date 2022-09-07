@@ -11,7 +11,12 @@ GLTFOptimiser is a tool designed to process and optimise GLTF files
 
 ## Features
 
-- ????
+- Remove unused images/textures/materials
+- Remove duplicate images/textures/materials
+- Create basisu UASTC compressed ktx2 image files
+	- Optionally replace existing images with compressed ones or keep both
+	- Generates full high-quality mip-map pyramids
+	- Normalises normal map textures (including each mip level)
 
 ## Downloads
 
