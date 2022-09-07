@@ -355,7 +355,7 @@ bool TextureLoad::normalise() noexcept
                 pixel[1] = static_cast<T>(g * scale);
                 pixel[2] = static_cast<T>(b * scale);
                 for (size_t k = 0; k < 3; ++k) {
-                    const size_t sourceIndex = channelCount * (x + y * imageWidth) + k;
+                    const size_t sourceIndex = 3 * (x + y * imageWidth) + k;
                     destData[sourceIndex] = pixel[k];
                 }
             }
@@ -377,6 +377,7 @@ bool TextureLoad::normalise() noexcept
 
     if (outData != data) {
         // Swap in new data
+        channelCount = 3;
         swap(outData, data);
     }
     return true;
