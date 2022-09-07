@@ -19,6 +19,7 @@
 #include "SharedCGLTF.h"
 
 #include <map>
+#include <ranges>
 #include <set>
 #include <vector>
 
@@ -73,6 +74,10 @@ bool Optimiser::passMeshes() noexcept
             cgltf_material* material2 = &dataCGLTF->materials[j];
             if (*material == *material2) {
                 materialDuplicates[material2] = material;
+                // Check if material is itself a replacement
+                if (auto pos = materialDuplicates.find(material); pos != materialDuplicates.end()) {
+                    materialDuplicates[material2] = pos->second;
+                }
             }
         }
     }
@@ -87,9 +92,18 @@ bool Optimiser::passMeshes() noexcept
         }
     }
     // Remove duplicate materials
-    for (size_t offset = 0; auto& i : materialDuplicates) {
-        removeMaterial(i.first - offset, true);
-        ++offset;
+    for (auto& i : materialDuplicates | views::reverse) {
+        auto current = i.first;
+        auto current2 = i.second;
+        printWarning("Removed duplicate material: "s + ((current->name != nullptr) ? current->name : "unnamed") + ", " +
+            ((current2->name != nullptr) ? current2->name : "unnamed"));
+        removeMaterial(current, false);
+        // Update pointers for move
+        for (auto& j : materialDuplicates) {
+            if (j.second > current) {
+                j.second = j.second - 1;
+            }
+        }
     }
 
     // TODO: optimise meshes

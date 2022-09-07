@@ -20,6 +20,7 @@
 #include "TextureLoad.h"
 
 #include <map>
+#include <ranges>
 #include <set>
 #include <vector>
 
@@ -101,6 +102,10 @@ bool Optimiser::passTextures() noexcept
             cgltf_image* image2 = &dataCGLTF->images[j];
             if (*image == *image2) {
                 imageDuplicates[image2] = image;
+                // Check if image is itself a replacement
+                if (auto pos = imageDuplicates.find(image); pos != imageDuplicates.end()) {
+                    imageDuplicates[image2] = pos->second;
+                }
             }
         }
     }
@@ -115,9 +120,18 @@ bool Optimiser::passTextures() noexcept
         }
     }
     // Remove duplicate images
-    for (size_t offset = 0; auto& i : imageDuplicates) {
-        removeImage(i.first - offset, true);
-        ++offset;
+    for (auto& i : imageDuplicates | views::reverse) {
+        auto current = i.first;
+        auto current2 = i.second;
+        printWarning("Removed duplicate image: "s + ((current->name != nullptr) ? current->name : current->uri) + ", " +
+            ((current2->name != nullptr) ? current2->name : current2->uri));
+        removeImage(current, false);
+        // Update pointers for move
+        for (auto& j : imageDuplicates) {
+            if (j.second > current) {
+                j.second = j.second - 1;
+            }
+        }
     }
 
     // Check for duplicate textures
@@ -128,6 +142,10 @@ bool Optimiser::passTextures() noexcept
             cgltf_texture* texture2 = &dataCGLTF->textures[j];
             if (*texture == *texture2) {
                 textureDuplicates[texture2] = texture;
+                // Check if texture is itself a replacement
+                if (auto pos = textureDuplicates.find(texture); pos != textureDuplicates.end()) {
+                    textureDuplicates[texture2] = pos->second;
+                }
             }
         }
     }
@@ -141,9 +159,26 @@ bool Optimiser::passTextures() noexcept
         });
     }
     // Remove duplicate textures
-    for (size_t offset = 0; auto& i : textureDuplicates) {
-        removeTexture(i.first - offset, true);
-        ++offset;
+    for (auto& i : textureDuplicates | views::reverse) {
+        auto current = i.first;
+        auto current2 = i.second;
+        printWarning("Removed duplicate texture: "s +
+            ((current->name != nullptr)               ? current->name :
+                    (current->image->name != nullptr) ? current->image->name :
+                    (current->image->uri != nullptr)  ? current->image->uri :
+                                                        "unnamed") +
+            ", " +
+            ((current2->name != nullptr)               ? current2->name :
+                    (current2->image->name != nullptr) ? current2->image->name :
+                    (current2->image->uri != nullptr)  ? current2->image->uri :
+                                                         "unnamed"));
+        removeTexture(current, false);
+        // Update pointers for move
+        for (auto& j : textureDuplicates) {
+            if (j.second > current) {
+                j.second = j.second - 1;
+            }
+        }
     }
 
     // Convert all textures
@@ -245,6 +280,7 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         // Check if pointers have moved
         if (newMemory != dataCGLTF->images) {
             // Fixup all image pointers
+            image = (image - dataCGLTF->images) + newMemory;
             for (size_t i = 0; i < dataCGLTF->textures_count; ++i) {
                 cgltf_texture& current = dataCGLTF->textures[i];
                 if (current.image != nullptr) {
@@ -259,11 +295,10 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         newImage = &dataCGLTF->images[dataCGLTF->images_count];
         *newImage = {0};
         string_view basisu = "/basisu"sv;
-        size_t nameLength = strlen(image->name);
-        newImage->name = static_cast<char*>(malloc(nameLength + basisu.length() + 1));
+        newImage->name = static_cast<char*>(malloc(strlen(image->name) + basisu.length() + 1));
         if (newImage->name != nullptr) {
-            memcpy(newImage->name, image->name, nameLength);
-            memcpy(newImage->name + nameLength, basisu.data(), basisu.length() + 1);
+            strcpy(newImage->name, image->name);
+            strcat(newImage->name, basisu.data());
         }
         ++dataCGLTF->images_count;
     } else {

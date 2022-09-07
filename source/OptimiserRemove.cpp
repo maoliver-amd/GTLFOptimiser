@@ -24,7 +24,7 @@
 
 using namespace std;
 
-void Optimiser::removeImage(cgltf_image* image, bool duplicate) noexcept
+void Optimiser::removeImage(cgltf_image* image, bool print) noexcept
 {
     // Remove the image from the images list
     cgltf_size imagePos = 0;
@@ -34,15 +34,13 @@ void Optimiser::removeImage(cgltf_image* image, bool duplicate) noexcept
             const char* name = (current->name != nullptr) ? current->name :
                 (current->uri != nullptr)                 ? current->uri :
                                                             "unnamed";
-            if (!duplicate) {
+            if (print) {
                 printWarning("Removed unused image: "s + name);
                 if (current->uri != nullptr) {
                     // Delete file from disk
                     string imageFile = rootFolder + image->uri;
                     remove(imageFile.c_str());
                 }
-            } else {
-                printWarning("Removed duplicate image: "s + name);
             }
             // Remove image from gltf
             cgltf_remove_image(dataCGLTF.get(), current);
@@ -56,25 +54,23 @@ void Optimiser::removeImage(cgltf_image* image, bool duplicate) noexcept
         }
     }
 
-    if (!duplicate) {
-        // Loop through all textures and set any matching pointers to null
-        cgltf_size j = 0;
-        while (true) {
-            cgltf_texture* current = &dataCGLTF->textures[j];
-            if (current->image == image) {
-                current->image = nullptr;
-            }
-            if (current->basisu_image == image) {
-                current->basisu_image = nullptr;
-            }
-            // If texture has no valid images then remove it
-            if (current->image == nullptr && current->basisu_image == nullptr) {
-                removeTexture(current);
-                --j;
-            }
-            if (++j >= dataCGLTF->textures_count) {
-                break;
-            }
+    // Loop through all textures and set any matching pointers to null
+    cgltf_size j = 0;
+    while (true) {
+        cgltf_texture* current = &dataCGLTF->textures[j];
+        if (current->image == image) {
+            current->image = nullptr;
+        }
+        if (current->basisu_image == image) {
+            current->basisu_image = nullptr;
+        }
+        // If texture has no valid images then remove it
+        if (current->image == nullptr && current->basisu_image == nullptr) {
+            removeTexture(current);
+            --j;
+        }
+        if (++j >= dataCGLTF->textures_count) {
+            break;
         }
     }
 
@@ -91,7 +87,7 @@ void Optimiser::removeImage(cgltf_image* image, bool duplicate) noexcept
     }
 }
 
-void Optimiser::removeTexture(cgltf_texture* texture, bool duplicate) noexcept
+void Optimiser::removeTexture(cgltf_texture* texture, bool print) noexcept
 {
     // Check for orphaned images
     map<cgltf_image*, bool> orphanedImages;
@@ -122,10 +118,8 @@ void Optimiser::removeTexture(cgltf_texture* texture, bool duplicate) noexcept
         cgltf_texture* current = &dataCGLTF->textures[texPos];
         if (current == texture) {
             const char* name = (current->name != nullptr) ? current->name : "unnamed";
-            if (!duplicate) {
+            if (print) {
                 printWarning("Removed unused texture: "s + name);
-            } else {
-                printWarning("Removed duplicate texture: "s + name);
             }
             cgltf_remove_texture(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->textures_count - texPos - 1) * sizeof(cgltf_texture));
@@ -138,16 +132,14 @@ void Optimiser::removeTexture(cgltf_texture* texture, bool duplicate) noexcept
         }
     }
 
-    if (!duplicate) {
-        // Loop through all materials and set any matching pointers to null
-        for (cgltf_size j = 0; j < dataCGLTF->materials_count; ++j) {
-            cgltf_material& current = dataCGLTF->materials[j];
-            runOverMaterialTextures(current, [&](cgltf_texture*& p, bool, bool, bool = false) {
-                if (p == texture) {
-                    p = nullptr;
-                }
-            });
-        }
+    // Loop through all materials and set any matching pointers to null
+    for (cgltf_size j = 0; j < dataCGLTF->materials_count; ++j) {
+        cgltf_material& current = dataCGLTF->materials[j];
+        runOverMaterialTextures(current, [&](cgltf_texture*& p, bool, bool, bool = false) {
+            if (p == texture) {
+                p = nullptr;
+            }
+        });
     }
 
     // Loop through all materials and update texture pointers to compensate for list change
@@ -162,7 +154,7 @@ void Optimiser::removeTexture(cgltf_texture* texture, bool duplicate) noexcept
     }
 }
 
-void Optimiser::removeMesh(cgltf_mesh* mesh, bool duplicate) noexcept
+void Optimiser::removeMesh(cgltf_mesh* mesh, bool print) noexcept
 {
     // Check for orphaned materials
     map<cgltf_material*, bool> orphanedMaterials;
@@ -193,10 +185,8 @@ void Optimiser::removeMesh(cgltf_mesh* mesh, bool duplicate) noexcept
         cgltf_mesh* current = &dataCGLTF->meshes[meshPos];
         if (current == mesh) {
             const char* name = (current->name != nullptr) ? current->name : "unnamed";
-            if (!duplicate) {
+            if (print) {
                 printWarning("Removed unused mesh: "s + name);
-            } else {
-                printWarning("Removed duplicate mesh: "s + name);
             }
             cgltf_remove_mesh(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->meshes_count - meshPos - 1) * sizeof(cgltf_mesh));
@@ -209,13 +199,11 @@ void Optimiser::removeMesh(cgltf_mesh* mesh, bool duplicate) noexcept
         }
     }
 
-    if (!duplicate) {
-        // Loop through all nodes and set any matching pointers to null
-        for (cgltf_size j = 0; j < dataCGLTF->nodes_count; ++j) {
-            cgltf_node& current = dataCGLTF->nodes[j];
-            if (current.mesh == mesh) {
-                current.mesh = nullptr;
-            }
+    // Loop through all nodes and set any matching pointers to null
+    for (cgltf_size j = 0; j < dataCGLTF->nodes_count; ++j) {
+        cgltf_node& current = dataCGLTF->nodes[j];
+        if (current.mesh == mesh) {
+            current.mesh = nullptr;
         }
     }
 
@@ -229,7 +217,7 @@ void Optimiser::removeMesh(cgltf_mesh* mesh, bool duplicate) noexcept
     }
 }
 
-void Optimiser::removeMaterial(cgltf_material* material, bool duplicate) noexcept
+void Optimiser::removeMaterial(cgltf_material* material, bool print) noexcept
 {
     // Check for orphaned textures
     map<cgltf_texture*, bool> orphanedTextures;
@@ -258,10 +246,8 @@ void Optimiser::removeMaterial(cgltf_material* material, bool duplicate) noexcep
         cgltf_material* current = &dataCGLTF->materials[matPos];
         if (current == material) {
             const char* name = (current->name != nullptr) ? current->name : "unnamed";
-            if (!duplicate) {
+            if (print) {
                 printWarning("Removed unused material: "s + name);
-            } else {
-                printWarning("Removed duplicate material: "s + name);
             }
             cgltf_remove_material(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->materials_count - matPos - 1) * sizeof(cgltf_material));
@@ -274,15 +260,13 @@ void Optimiser::removeMaterial(cgltf_material* material, bool duplicate) noexcep
         }
     }
 
-    if (!duplicate) {
-        // Loop through all primitives and set any matching pointers to null
-        for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
-            cgltf_mesh& mesh = dataCGLTF->meshes[i];
-            for (cgltf_size j = 0; j < mesh.primitives_count; ++j) {
-                cgltf_primitive& prim = mesh.primitives[j];
-                if (prim.material == material) {
-                    prim.material = nullptr;
-                }
+    // Loop through all primitives and set any matching pointers to null
+    for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
+        cgltf_mesh& mesh = dataCGLTF->meshes[i];
+        for (cgltf_size j = 0; j < mesh.primitives_count; ++j) {
+            cgltf_primitive& prim = mesh.primitives[j];
+            if (prim.material == material) {
+                prim.material = nullptr;
             }
         }
     }

@@ -37,13 +37,13 @@ private:
 
     [[nodiscard]] bool passMeshes() noexcept;
 
-    void removeImage(cgltf_image* image, bool duplicate = false) noexcept;
+    void removeImage(cgltf_image* image, bool print = true) noexcept;
 
-    void removeTexture(cgltf_texture* texture, bool duplicate = false) noexcept;
+    void removeTexture(cgltf_texture* texture, bool print = true) noexcept;
 
-    void removeMesh(cgltf_mesh* mesh, bool duplicate = false) noexcept;
+    void removeMesh(cgltf_mesh* mesh, bool print = true) noexcept;
 
-    void removeMaterial(cgltf_material* material, bool duplicate = false) noexcept;
+    void removeMaterial(cgltf_material* material, bool print = true) noexcept;
 
     bool convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap, bool split = false) noexcept;
 
