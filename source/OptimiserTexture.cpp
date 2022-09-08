@@ -123,8 +123,7 @@ bool Optimiser::passTextures() noexcept
     for (auto& i : imageDuplicates | views::reverse) {
         auto current = i.first;
         auto current2 = i.second;
-        printWarning("Removed duplicate image: "s + ((current->name != nullptr) ? current->name : current->uri) + ", " +
-            ((current2->name != nullptr) ? current2->name : current2->uri));
+        printWarning("Removed duplicate image: "s + getName(*current) + ", " + getName(*current2));
         removeImage(current, false);
         // Update pointers for move
         for (auto& j : imageDuplicates) {
@@ -162,16 +161,7 @@ bool Optimiser::passTextures() noexcept
     for (auto& i : textureDuplicates | views::reverse) {
         auto current = i.first;
         auto current2 = i.second;
-        printWarning("Removed duplicate texture: "s +
-            ((current->name != nullptr)               ? current->name :
-                    (current->image->name != nullptr) ? current->image->name :
-                    (current->image->uri != nullptr)  ? current->image->uri :
-                                                        "unnamed") +
-            ", " +
-            ((current2->name != nullptr)               ? current2->name :
-                    (current2->image->name != nullptr) ? current2->image->name :
-                    (current2->image->uri != nullptr)  ? current2->image->uri :
-                                                         "unnamed"));
+        printWarning("Removed duplicate texture: "s + getName(*current) + ", " + getName(*current2));
         removeTexture(current, false);
         // Update pointers for move
         for (auto& j : textureDuplicates) {

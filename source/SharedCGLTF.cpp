@@ -91,10 +91,32 @@ bool operator==(const cgltf_material& a, const cgltf_material& b) noexcept
         memcmp(&a.alpha_mode, &b.alpha_mode, sizeof(cgltf_alpha_mode)) == 0 &&
         memcmp(&a.alpha_cutoff, &b.alpha_cutoff, sizeof(cgltf_float)) == 0 &&
         memcmp(&a.double_sided, &b.double_sided, sizeof(cgltf_bool)) == 0 &&
-        memcmp(&a.unlit, &b.unlit, sizeof(cgltf_bool)) == 0) {
+        memcmp(&a.unlit, &b.unlit, sizeof(cgltf_bool)) == 0 &&
+        memcmp(&a.iridescence, &b.iridescence, sizeof(cgltf_iridescence)) == 0) {
         return true;
     }
     return false;
+}
+
+const char* getName(const cgltf_material& material) noexcept
+{
+    return (material.name != nullptr) ? material.name : "unnamed";
+}
+
+const char* getName(const cgltf_image& image) noexcept
+{
+    return (image.name != nullptr) ? image.name : (image.uri != nullptr) ? image.uri : "unnamed";
+}
+
+const char* getName(const cgltf_texture& texture) noexcept
+{
+    return (texture.name != nullptr) ? texture.name :
+                                       ((texture.image != nullptr) ? getName(*texture.image) : "unnamed");
+}
+
+const char* getName(const cgltf_mesh& mesh) noexcept
+{
+    return (mesh.name != nullptr) ? mesh.name : "unnamed";
 }
 
 void cgltf_remove_mesh(cgltf_data* data, cgltf_mesh* mesh) noexcept

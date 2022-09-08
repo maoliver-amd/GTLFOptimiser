@@ -31,14 +31,11 @@ void Optimiser::removeImage(cgltf_image* image, bool print) noexcept
     while (true) {
         cgltf_image* current = &dataCGLTF->images[imagePos];
         if (current == image) {
-            const char* name = (current->name != nullptr) ? current->name :
-                (current->uri != nullptr)                 ? current->uri :
-                                                            "unnamed";
             if (print) {
-                printWarning("Removed unused image: "s + name);
+                printWarning("Removed unused image: "s + getName(*current));
                 if (current->uri != nullptr) {
                     // Delete file from disk
-                    string imageFile = rootFolder + image->uri;
+                    string imageFile = rootFolder + current->uri;
                     remove(imageFile.c_str());
                 }
             }
@@ -117,9 +114,8 @@ void Optimiser::removeTexture(cgltf_texture* texture, bool print) noexcept
     while (true) {
         cgltf_texture* current = &dataCGLTF->textures[texPos];
         if (current == texture) {
-            const char* name = (current->name != nullptr) ? current->name : "unnamed";
             if (print) {
-                printWarning("Removed unused texture: "s + name);
+                printWarning("Removed unused texture: "s + getName(*current));
             }
             cgltf_remove_texture(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->textures_count - texPos - 1) * sizeof(cgltf_texture));
@@ -184,9 +180,8 @@ void Optimiser::removeMesh(cgltf_mesh* mesh, bool print) noexcept
     while (true) {
         cgltf_mesh* current = &dataCGLTF->meshes[meshPos];
         if (current == mesh) {
-            const char* name = (current->name != nullptr) ? current->name : "unnamed";
             if (print) {
-                printWarning("Removed unused mesh: "s + name);
+                printWarning("Removed unused mesh: "s + getName(*current));
             }
             cgltf_remove_mesh(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->meshes_count - meshPos - 1) * sizeof(cgltf_mesh));
@@ -245,9 +240,8 @@ void Optimiser::removeMaterial(cgltf_material* material, bool print) noexcept
     while (true) {
         cgltf_material* current = &dataCGLTF->materials[matPos];
         if (current == material) {
-            const char* name = (current->name != nullptr) ? current->name : "unnamed";
             if (print) {
-                printWarning("Removed unused material: "s + name);
+                printWarning("Removed unused material: "s + getName(*current));
             }
             cgltf_remove_material(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->materials_count - matPos - 1) * sizeof(cgltf_material));

@@ -95,8 +95,7 @@ bool Optimiser::passMeshes() noexcept
     for (auto& i : materialDuplicates | views::reverse) {
         auto current = i.first;
         auto current2 = i.second;
-        printWarning("Removed duplicate material: "s + ((current->name != nullptr) ? current->name : "unnamed") + ", " +
-            ((current2->name != nullptr) ? current2->name : "unnamed"));
+        printWarning("Removed duplicate material: "s + getName(*current) + ", " + getName(*current2));
         removeMaterial(current, false);
         // Update pointers for move
         for (auto& j : materialDuplicates) {

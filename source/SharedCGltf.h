@@ -29,6 +29,14 @@ bool operator==(const cgltf_texture& a, const cgltf_texture& b) noexcept;
 
 bool operator==(const cgltf_material& a, const cgltf_material& b) noexcept;
 
+const char* getName(const cgltf_material& material) noexcept;
+
+const char* getName(const cgltf_image& image) noexcept;
+
+const char* getName(const cgltf_texture& texture) noexcept;
+
+const char* getName(const cgltf_mesh& mesh) noexcept;
+
 template<typename Func>
 void runOverMaterialTextures(cgltf_material& material, Func function) noexcept
 {
