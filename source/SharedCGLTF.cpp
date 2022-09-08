@@ -99,54 +99,54 @@ bool operator==(const cgltf_material& a, const cgltf_material& b) noexcept
 
 void cgltf_remove_mesh(cgltf_data* data, cgltf_mesh* mesh) noexcept
 {
-    data->memory.free(data->memory.user_data, mesh->name);
+    data->memory.free_func(data->memory.user_data, mesh->name);
 
     for (cgltf_size j = 0; j < mesh->primitives_count; ++j) {
         for (cgltf_size k = 0; k < mesh->primitives[j].attributes_count; ++k) {
-            data->memory.free(data->memory.user_data, mesh->primitives[j].attributes[k].name);
+            data->memory.free_func(data->memory.user_data, mesh->primitives[j].attributes[k].name);
         }
 
-        data->memory.free(data->memory.user_data, mesh->primitives[j].attributes);
+        data->memory.free_func(data->memory.user_data, mesh->primitives[j].attributes);
 
         for (cgltf_size k = 0; k < mesh->primitives[j].targets_count; ++k) {
             for (cgltf_size m = 0; m < mesh->primitives[j].targets[k].attributes_count; ++m) {
-                data->memory.free(data->memory.user_data, mesh->primitives[j].targets[k].attributes[m].name);
+                data->memory.free_func(data->memory.user_data, mesh->primitives[j].targets[k].attributes[m].name);
             }
 
-            data->memory.free(data->memory.user_data, mesh->primitives[j].targets[k].attributes);
+            data->memory.free_func(data->memory.user_data, mesh->primitives[j].targets[k].attributes);
         }
 
-        data->memory.free(data->memory.user_data, mesh->primitives[j].targets);
+        data->memory.free_func(data->memory.user_data, mesh->primitives[j].targets);
 
         if (mesh->primitives[j].has_draco_mesh_compression) {
             for (cgltf_size k = 0; k < mesh->primitives[j].draco_mesh_compression.attributes_count; ++k) {
-                data->memory.free(
+                data->memory.free_func(
                     data->memory.user_data, mesh->primitives[j].draco_mesh_compression.attributes[k].name);
             }
 
-            data->memory.free(data->memory.user_data, mesh->primitives[j].draco_mesh_compression.attributes);
+            data->memory.free_func(data->memory.user_data, mesh->primitives[j].draco_mesh_compression.attributes);
         }
 
-        data->memory.free(data->memory.user_data, mesh->primitives[j].mappings);
+        data->memory.free_func(data->memory.user_data, mesh->primitives[j].mappings);
 
         cgltf_free_extensions(data, mesh->primitives[j].extensions, mesh->primitives[j].extensions_count);
     }
 
-    data->memory.free(data->memory.user_data, mesh->primitives);
-    data->memory.free(data->memory.user_data, mesh->weights);
+    data->memory.free_func(data->memory.user_data, mesh->primitives);
+    data->memory.free_func(data->memory.user_data, mesh->weights);
 
     for (cgltf_size j = 0; j < mesh->target_names_count; ++j) {
-        data->memory.free(data->memory.user_data, mesh->target_names[j]);
+        data->memory.free_func(data->memory.user_data, mesh->target_names[j]);
     }
 
     cgltf_free_extensions(data, mesh->extensions, mesh->extensions_count);
 
-    data->memory.free(data->memory.user_data, mesh->target_names);
+    data->memory.free_func(data->memory.user_data, mesh->target_names);
 }
 
 void cgltf_remove_material(cgltf_data* data, cgltf_material* material) noexcept
 {
-    data->memory.free(data->memory.user_data, material->name);
+    data->memory.free_func(data->memory.user_data, material->name);
 
     if (material->has_pbr_metallic_roughness) {
         cgltf_free_extensions(data, material->pbr_metallic_roughness.metallic_roughness_texture.extensions,
@@ -188,6 +188,12 @@ void cgltf_remove_material(cgltf_data* data, cgltf_material* material) noexcept
         cgltf_free_extensions(data, material->sheen.sheen_roughness_texture.extensions,
             material->sheen.sheen_roughness_texture.extensions_count);
     }
+    if (material->has_iridescence) {
+        cgltf_free_extensions(data, material->iridescence.iridescence_texture.extensions,
+            material->iridescence.iridescence_texture.extensions_count);
+        cgltf_free_extensions(data, material->iridescence.iridescence_thickness_texture.extensions,
+            material->iridescence.iridescence_thickness_texture.extensions_count);
+    }
 
     cgltf_free_extensions(data, material->normal_texture.extensions, material->normal_texture.extensions_count);
     cgltf_free_extensions(data, material->occlusion_texture.extensions, material->occlusion_texture.extensions_count);
@@ -198,15 +204,15 @@ void cgltf_remove_material(cgltf_data* data, cgltf_material* material) noexcept
 
 void cgltf_remove_image(cgltf_data* data, cgltf_image* image) noexcept
 {
-    data->memory.free(data->memory.user_data, image->name);
-    data->memory.free(data->memory.user_data, image->uri);
-    data->memory.free(data->memory.user_data, image->mime_type);
+    data->memory.free_func(data->memory.user_data, image->name);
+    data->memory.free_func(data->memory.user_data, image->uri);
+    data->memory.free_func(data->memory.user_data, image->mime_type);
 
     cgltf_free_extensions(data, image->extensions, image->extensions_count);
 }
 
 void cgltf_remove_texture(cgltf_data* data, cgltf_texture* texture) noexcept
 {
-    data->memory.free(data->memory.user_data, texture->name);
+    data->memory.free_func(data->memory.user_data, texture->name);
     cgltf_free_extensions(data, texture->extensions, texture->extensions_count);
 }
