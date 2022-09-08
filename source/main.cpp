@@ -31,9 +31,9 @@ int main(int argc, char* argv[])
     string inputFile;
     app.add_option("-i,--input", inputFile, "The input GLTF file")->required();
     string outputFile;
-    app.add_option("-o,--output", outputFile, "The output GLTF file")->default_str(inputFile);
+    app.add_option("-o,--output", outputFile, "The output GLTF file (defaults to input file)")->default_str(inputFile);
     bool keepTextures = false;
-    app.add_flag("--kt", keepTextures, "Keep original uncompressed textures");
+    app.add_flag("-k,--keep-uncompressed-textures", keepTextures, "Keep original uncompressed textures");
     CLI11_PARSE(app, argc, argv);
     if (outputFile.empty()) {
         outputFile = inputFile;

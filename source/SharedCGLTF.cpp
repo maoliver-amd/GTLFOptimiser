@@ -20,27 +20,27 @@
 
 using namespace std;
 
-string_view getCGLTFError(const cgltf_result result, const shared_ptr<cgltf_data>& data) noexcept
+string getCGLTFError(const cgltf_result result, const shared_ptr<cgltf_data>& data) noexcept
 {
     switch (result) {
         case cgltf_result_file_not_found:
-            return data ? "Resource not found"sv : "File not found"sv;
+            return data ? "Resource not found"s : "File not found"s;
         case cgltf_result_io_error:
-            return "I/O error"sv;
+            return "I/O error"s;
         case cgltf_result_invalid_json:
-            return "Invalid JSON"sv;
+            return "Invalid JSON"s;
         case cgltf_result_invalid_gltf:
-            return "Invalid GLTF"sv;
+            return "Invalid GLTF"s;
         case cgltf_result_out_of_memory:
-            return "Out of memory"sv;
+            return "Out of memory"s;
         case cgltf_result_legacy_gltf:
-            return "Legacy GLTF"sv;
+            return "Legacy GLTF"s;
         case cgltf_result_data_too_short:
-            return data ? "Buffer too short"sv : "Unknown file type (not a GLTF file)"sv;
+            return data ? "Buffer too short"s : "Unknown file type (not a GLTF file)"s;
         case cgltf_result_unknown_format:
-            return data ? "Unknown resource format"sv : "Unknown file type (not a GLTF file)"sv;
+            return data ? "Unknown resource format"s : "Unknown file type (not a GLTF file)"s;
         case cgltf_result_success:
-            return "Success"sv;
+            return "Success"s;
         default:
             return "Unknown error";
     }

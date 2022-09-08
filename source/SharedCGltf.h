@@ -17,9 +17,9 @@
 
 #include <cgltf.h>
 #include <memory>
-#include <string_view>
+#include <string>
 
-std::string_view getCGLTFError(const cgltf_result result, const std::shared_ptr<cgltf_data>& data) noexcept;
+std::string getCGLTFError(const cgltf_result result, const std::shared_ptr<cgltf_data>& data) noexcept;
 
 bool requiresGLTFExtension(const std::shared_ptr<cgltf_data>& data, const std::string_view& name) noexcept;
 

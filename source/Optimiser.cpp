@@ -54,17 +54,17 @@ bool Optimiser::pass(const std::string& inputFile, const std::string& outputFile
         }(),
         [](auto p) { cgltf_free(p); });
     if (result != cgltf_result_success) {
-        printError(getCGLTFError(result, dataCGLTF));
+        printError("Failed to parse input file: "s + getCGLTFError(result, dataCGLTF));
         return 1;
     }
     result = cgltf_load_buffers(&optionsCGLTF, dataCGLTF.get(), inputFile.c_str());
     if (result != cgltf_result_success) {
-        printError(getCGLTFError(result, dataCGLTF));
+        printError("Failed to load input file buffers: "s + getCGLTFError(result, dataCGLTF));
         return 1;
     }
     result = cgltf_validate(dataCGLTF.get());
     if (result != cgltf_result_success) {
-        printError(getCGLTFError(result, dataCGLTF));
+        printError("Invalid input file detected: "s + getCGLTFError(result, dataCGLTF));
         return 1;
     }
 
@@ -100,9 +100,15 @@ bool Optimiser::pass(const std::string& inputFile, const std::string& outputFile
     }
     dataCGLTF->asset.generator = static_cast<char*>(newMem);
     std::strcpy(dataCGLTF->asset.generator, generator.data());
+    // Validate output file
+    result = cgltf_validate(dataCGLTF.get());
+    if (result != cgltf_result_success) {
+        printError("Invalid output file detected: "s + getCGLTFError(result, dataCGLTF));
+        return 1;
+    }
     result = cgltf_write_file(&optionsCGLTF, outputFile.c_str(), dataCGLTF.get());
     if (result != cgltf_result_success) {
-        printError(getCGLTFError(result, dataCGLTF));
+        printError("Failed writing output file: "s + getCGLTFError(result, dataCGLTF));
         return false;
     }
 
