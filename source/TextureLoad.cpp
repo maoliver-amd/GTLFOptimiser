@@ -249,8 +249,14 @@ bool TextureLoad::isUniqueTexture() noexcept
     // Check if all texels are identical
     auto func = [&]<typename T>(T* sourceData) {
         std::array<T, 4> check = {0};
+        bool zero = false;
         for (size_t k = 0; k < channelCount; ++k) {
             check[k] = sourceData[k];
+            zero &= check[k] == 0;
+        }
+        if (!zero) {
+            // Quick early out if texels values are non-zero
+            return true;
         }
         for (size_t y = 0; y < imageHeight; ++y) {
             for (size_t x = 0; x < imageWidth; ++x) {
@@ -274,6 +280,8 @@ bool TextureLoad::isUniqueTexture() noexcept
         uint32_t* sourceData = reinterpret_cast<uint32_t*>(data.get());
         return func(sourceData);
     }
+    // TODO: return the actual constant texel value in order to check if it is non-zero (i.e. should be folded back into
+    // material factor)
     return false;
 }
 
