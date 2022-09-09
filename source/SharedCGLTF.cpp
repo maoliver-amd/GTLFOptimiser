@@ -57,9 +57,7 @@ bool requiresGLTFExtension(const shared_ptr<cgltf_data>& data, const string_view
 
 bool operator==(const cgltf_image& a, const cgltf_image& b) noexcept
 {
-    if (a.uri == b.uri && a.uri != nullptr) {
-        return true;
-    } else if (a.buffer_view == b.buffer_view && a.buffer_view != nullptr) {
+    if (a.uri == b.uri && a.buffer_view == b.buffer_view) {
         return true;
     }
     return false;
@@ -67,8 +65,8 @@ bool operator==(const cgltf_image& a, const cgltf_image& b) noexcept
 
 bool operator==(const cgltf_texture& a, const cgltf_texture& b) noexcept
 {
-    if (((a.image == b.image && a.image != nullptr) || a.basisu_image == b.basisu_image && a.basisu_image != nullptr) &&
-        a.sampler == b.sampler) {
+    if ((a.image == b.image) && (a.basisu_image == b.basisu_image) &&
+        (a.sampler == b.sampler)) {
         return true;
     }
     return false;

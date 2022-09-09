@@ -65,10 +65,7 @@ void Optimiser::checkUnusedTextures() noexcept
         cgltf_material& material = dataCGLTF->materials[i];
         runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool, bool = false) {
             if (p != nullptr) {
-                if (p->image != nullptr || p->basisu_image != nullptr) {
-                    // Note: Assumes that invalid images have already been removed
-                    validTextures.insert(p);
-                }
+                validTextures.insert(p);
             }
         });
     }
