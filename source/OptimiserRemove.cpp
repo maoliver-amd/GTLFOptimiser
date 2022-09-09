@@ -24,21 +24,13 @@
 
 using namespace std;
 
-void Optimiser::removeImage(cgltf_image* image, bool print) noexcept
+void Optimiser::removeImage(cgltf_image* image) noexcept
 {
     // Remove the image from the images list
     cgltf_size imagePos = 0;
     while (true) {
         cgltf_image* current = &dataCGLTF->images[imagePos];
         if (current == image) {
-            if (print) {
-                printWarning("Removed unused image: "s + getName(*current));
-                if (current->uri != nullptr) {
-                    // Delete file from disk
-                    string imageFile = rootFolder + current->uri;
-                    remove(imageFile.c_str());
-                }
-            }
             // Remove image from gltf
             cgltf_remove_image(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->images_count - imagePos - 1) * sizeof(cgltf_image));
@@ -84,7 +76,7 @@ void Optimiser::removeImage(cgltf_image* image, bool print) noexcept
     }
 }
 
-void Optimiser::removeTexture(cgltf_texture* texture, bool print) noexcept
+void Optimiser::removeTexture(cgltf_texture* texture) noexcept
 {
     // Check for orphaned images
     map<cgltf_image*, bool> orphanedImages;
@@ -114,9 +106,6 @@ void Optimiser::removeTexture(cgltf_texture* texture, bool print) noexcept
     while (true) {
         cgltf_texture* current = &dataCGLTF->textures[texPos];
         if (current == texture) {
-            if (print) {
-                printWarning("Removed unused texture: "s + getName(*current));
-            }
             cgltf_remove_texture(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->textures_count - texPos - 1) * sizeof(cgltf_texture));
             --dataCGLTF->textures_count;
@@ -150,69 +139,7 @@ void Optimiser::removeTexture(cgltf_texture* texture, bool print) noexcept
     }
 }
 
-void Optimiser::removeMesh(cgltf_mesh* mesh, bool print) noexcept
-{
-    // Check for orphaned materials
-    map<cgltf_material*, bool> orphanedMaterials;
-    for (cgltf_size i = 0; i < mesh->primitives_count; ++i) {
-        cgltf_primitive& current = mesh->primitives[i];
-        if (current.material != nullptr) {
-            orphanedMaterials.emplace(current.material, false);
-        }
-    }
-    for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
-        cgltf_mesh* current = &dataCGLTF->meshes[i];
-        for (cgltf_size j = 0; j < current->primitives_count; ++j) {
-            cgltf_primitive& prim = current->primitives[j];
-            if (auto pos = orphanedMaterials.find(prim.material); pos != orphanedMaterials.end()) {
-                pos->second = true;
-            }
-        }
-    }
-    for (auto& i : orphanedMaterials) {
-        if (!i.second) {
-            removeMaterial(i.first);
-        }
-    }
-
-    // Remove the mesh from the meshes list
-    cgltf_size meshPos = 0;
-    while (true) {
-        cgltf_mesh* current = &dataCGLTF->meshes[meshPos];
-        if (current == mesh) {
-            if (print) {
-                printWarning("Removed unused mesh: "s + getName(*current));
-            }
-            cgltf_remove_mesh(dataCGLTF.get(), current);
-            memmove(current, current + 1, (dataCGLTF->meshes_count - meshPos - 1) * sizeof(cgltf_mesh));
-            --dataCGLTF->meshes_count;
-            dataCGLTF->meshes[dataCGLTF->meshes_count] = {0};
-            break;
-        }
-        if (++meshPos >= dataCGLTF->meshes_count) {
-            break;
-        }
-    }
-
-    // Loop through all nodes and set any matching pointers to null
-    for (cgltf_size j = 0; j < dataCGLTF->nodes_count; ++j) {
-        cgltf_node& current = dataCGLTF->nodes[j];
-        if (current.mesh == mesh) {
-            current.mesh = nullptr;
-        }
-    }
-
-    // Loop through all nodes and update mesh pointers to compensate for list change
-    cgltf_mesh* current = &dataCGLTF->meshes[meshPos];
-    for (cgltf_size k = 0; k < dataCGLTF->nodes_count; ++k) {
-        cgltf_node& node = dataCGLTF->nodes[k];
-        if (node.mesh >= current + 1) {
-            node.mesh = node.mesh - 1;
-        }
-    }
-}
-
-void Optimiser::removeMaterial(cgltf_material* material, bool print) noexcept
+void Optimiser::removeMaterial(cgltf_material* material) noexcept
 {
     // Check for orphaned textures
     map<cgltf_texture*, bool> orphanedTextures;
@@ -240,9 +167,6 @@ void Optimiser::removeMaterial(cgltf_material* material, bool print) noexcept
     while (true) {
         cgltf_material* current = &dataCGLTF->materials[matPos];
         if (current == material) {
-            if (print) {
-                printWarning("Removed unused material: "s + getName(*current));
-            }
             cgltf_remove_material(dataCGLTF.get(), current);
             memmove(current, current + 1, (dataCGLTF->materials_count - matPos - 1) * sizeof(cgltf_material));
             --dataCGLTF->materials_count;
@@ -274,6 +198,65 @@ void Optimiser::removeMaterial(cgltf_material* material, bool print) noexcept
             if (prim.material >= current + 1) {
                 prim.material = prim.material - 1;
             }
+        }
+    }
+}
+
+void Optimiser::removeMesh(cgltf_mesh* mesh) noexcept
+{
+    // Check for orphaned materials
+    map<cgltf_material*, bool> orphanedMaterials;
+    for (cgltf_size i = 0; i < mesh->primitives_count; ++i) {
+        cgltf_primitive& current = mesh->primitives[i];
+        if (current.material != nullptr) {
+            orphanedMaterials.emplace(current.material, false);
+        }
+    }
+    for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
+        cgltf_mesh* current = &dataCGLTF->meshes[i];
+        for (cgltf_size j = 0; j < current->primitives_count; ++j) {
+            cgltf_primitive& prim = current->primitives[j];
+            if (auto pos = orphanedMaterials.find(prim.material); pos != orphanedMaterials.end()) {
+                pos->second = true;
+            }
+        }
+    }
+    for (auto& i : orphanedMaterials) {
+        if (!i.second) {
+            removeMaterial(i.first);
+        }
+    }
+
+    // Remove the mesh from the meshes list
+    cgltf_size meshPos = 0;
+    while (true) {
+        cgltf_mesh* current = &dataCGLTF->meshes[meshPos];
+        if (current == mesh) {
+            cgltf_remove_mesh(dataCGLTF.get(), current);
+            memmove(current, current + 1, (dataCGLTF->meshes_count - meshPos - 1) * sizeof(cgltf_mesh));
+            --dataCGLTF->meshes_count;
+            dataCGLTF->meshes[dataCGLTF->meshes_count] = {0};
+            break;
+        }
+        if (++meshPos >= dataCGLTF->meshes_count) {
+            break;
+        }
+    }
+
+    // Loop through all nodes and set any matching pointers to null
+    for (cgltf_size j = 0; j < dataCGLTF->nodes_count; ++j) {
+        cgltf_node& current = dataCGLTF->nodes[j];
+        if (current.mesh == mesh) {
+            current.mesh = nullptr;
+        }
+    }
+
+    // Loop through all nodes and update mesh pointers to compensate for list change
+    cgltf_mesh* current = &dataCGLTF->meshes[meshPos];
+    for (cgltf_size k = 0; k < dataCGLTF->nodes_count; ++k) {
+        cgltf_node& node = dataCGLTF->nodes[k];
+        if (node.mesh >= current + 1) {
+            node.mesh = node.mesh - 1;
         }
     }
 }

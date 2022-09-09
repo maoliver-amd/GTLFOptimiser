@@ -19,6 +19,7 @@
 #include "SharedCGLTF.h"
 #include "TextureLoad.h"
 
+#include <fstream>
 #include <map>
 #include <ranges>
 #include <set>
@@ -28,154 +29,15 @@ using namespace std;
 
 bool Optimiser::passTextures() noexcept
 {
-    // Loop through and collect list of all valid images
-    set<cgltf_image*> removedImages;
-    set<cgltf_texture*> removedTextures;
-    for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
-        cgltf_texture& texture = dataCGLTF->textures[i];
-        if (texture.image == nullptr && texture.basisu_image == nullptr) {
-            removedTextures.insert(&texture);
-            continue;
-        }
-        if (texture.image == nullptr) {
-            // Doesn't contain a texture we can convert so just pass through the current one
-            images[texture.basisu_image] = true;
-            continue;
-        }
-        cgltf_image* image = texture.image;
-        if (image->uri == nullptr) {
-            removedImages.insert(image);
-            removedTextures.insert(&texture);
-            continue;
-        }
-        images[image] = false;
-    }
-
-    // Loop through all materials and check for unused textures
-    set<cgltf_texture*> validTextures;
-    for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
-        cgltf_material& material = dataCGLTF->materials[i];
-        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool, bool = false) {
-            if (p != nullptr) {
-                validTextures.insert(p);
-            }
-        });
-    }
-    for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
-        cgltf_texture* texture = &dataCGLTF->textures[i];
-        if (!validTextures.contains(texture)) {
-            removedTextures.insert(texture);
-        }
-    }
-
-    // Loop through all textures and check for unused images
-    set<cgltf_image*> validImages;
-    for (size_t i = 0; i < dataCGLTF->textures_count; ++i) {
-        cgltf_texture& texture = dataCGLTF->textures[i];
-        if (texture.basisu_image != nullptr) {
-            validImages.insert(texture.basisu_image);
-        }
-        if (texture.image != nullptr) {
-            validImages.insert(texture.image);
-        }
-    }
-    for (cgltf_size i = 0; i < dataCGLTF->images_count; ++i) {
-        cgltf_image* image = &dataCGLTF->images[i];
-        if (!validImages.contains(image)) {
-            removedImages.insert(image);
-        }
-    }
-
-    // Remove any found invalid images/textures
-    for (auto& i : removedImages) {
-        removeImage(i);
-    }
-    for (auto& i : removedTextures) {
-        removeTexture(i);
-    }
-
-    // Check for duplicate images
-    map<cgltf_image*, cgltf_image*> imageDuplicates;
-    for (cgltf_size i = 0; i < dataCGLTF->images_count; ++i) {
-        cgltf_image* image = &dataCGLTF->images[i];
-        for (cgltf_size j = i + 1; j < dataCGLTF->images_count; ++j) {
-            cgltf_image* image2 = &dataCGLTF->images[j];
-            if (*image == *image2) {
-                imageDuplicates[image2] = image;
-                // Check if image is itself a replacement
-                if (auto pos = imageDuplicates.find(image); pos != imageDuplicates.end()) {
-                    imageDuplicates[image2] = pos->second;
-                }
-            }
-        }
-    }
-    // Update textures to remove duplicate images
-    for (size_t i = 0; i < dataCGLTF->textures_count; ++i) {
-        cgltf_texture& texture = dataCGLTF->textures[i];
-        if (auto pos = imageDuplicates.find(texture.image); pos != imageDuplicates.end()) {
-            texture.image = pos->second;
-        }
-        if (auto pos = imageDuplicates.find(texture.basisu_image); pos != imageDuplicates.end()) {
-            texture.image = pos->second;
-        }
-    }
-    // Remove duplicate images
-    for (auto& i : imageDuplicates | views::reverse) {
-        auto current = i.first;
-        auto current2 = i.second;
-        printWarning("Removed duplicate image: "s + getName(*current) + ", " + getName(*current2));
-        removeImage(current, false);
-        // Update pointers for move
-        for (auto& j : imageDuplicates) {
-            if (j.second > current) {
-                j.second = j.second - 1;
-            }
-        }
-    }
-
-    // Check for duplicate textures
-    map<cgltf_texture*, cgltf_texture*> textureDuplicates;
-    for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
-        cgltf_texture* texture = &dataCGLTF->textures[i];
-        for (cgltf_size j = i + 1; j < dataCGLTF->textures_count; ++j) {
-            cgltf_texture* texture2 = &dataCGLTF->textures[j];
-            if (*texture == *texture2) {
-                textureDuplicates[texture2] = texture;
-                // Check if texture is itself a replacement
-                if (auto pos = textureDuplicates.find(texture); pos != textureDuplicates.end()) {
-                    textureDuplicates[texture2] = pos->second;
-                }
-            }
-        }
-    }
-    // Update materials to remove duplicate textures
-    for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
-        cgltf_material& material = dataCGLTF->materials[i];
-        runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool, bool = false) {
-            if (auto pos = textureDuplicates.find(p); pos != textureDuplicates.end()) {
-                p = pos->second;
-            }
-        });
-    }
-    // Remove duplicate textures
-    for (auto& i : textureDuplicates | views::reverse) {
-        auto current = i.first;
-        auto current2 = i.second;
-        printWarning("Removed duplicate texture: "s + getName(*current) + ", " + getName(*current2));
-        removeTexture(current, false);
-        // Update pointers for move
-        for (auto& j : textureDuplicates) {
-            if (j.second > current) {
-                j.second = j.second - 1;
-            }
-        }
-    }
-
     // Convert all textures
+    set<cgltf_texture*> images;
     for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& material = dataCGLTF->materials[i];
         runOverMaterialTextures(material, [&](cgltf_texture*& p, bool sRGB, bool normalMap, bool split = false) {
-            convertTexture(p, sRGB, normalMap, split);
+            if (images.find(p) == images.end()) {
+                convertTexture(p, sRGB, normalMap, split);
+                images.insert(p);
+            }
         });
     }
     return true;
@@ -192,25 +54,35 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
     if (image == nullptr) {
         return false;
     }
-    // Check if already converted
-    if (images[image]) {
-        return true;
+
+    string imageFile = rootFolder + image->uri;
+    const size_t fileExt = imageFile.rfind('.');
+    const string imageFileName = imageFile.substr(0, fileExt);
+
+    // Check for existing basisu texture
+    if (texture->basisu_image != nullptr && !options.replaceCompressedTextures) {
+        if (!split) {
+            return true;
+        } else {
+            // Check for split textures
+            const string metallicityFile = imageFileName + ".metallicity.ktx2";
+            const string roughnessFile = imageFileName + ".roughness.ktx2";
+            if (ifstream(metallicityFile.c_str()).good() && ifstream(roughnessFile.c_str()).good()) {
+                return true;
+            }
+        }
     }
 
     // Load in existing texture
     if (image->uri == nullptr || strlen(image->uri) == 0) {
         return false;
     }
-    string imageFile = rootFolder + image->uri;
     TextureLoad imageData(imageFile);
     if (imageData.data.get() == nullptr) {
         return false;
     }
     imageData.sRGB = sRGB;
     imageData.normalMap = normalMap;
-
-    const size_t fileExt = imageFile.rfind('.');
-    const string imageFileName = imageFile.substr(0, fileExt);
 
     // Convert
     if (split) {
@@ -245,14 +117,16 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         } else {
             printWarning("Skipping output of redundant split roughness texture '" + imageFile + "'");
         }
+
+        if (texture->basisu_image != nullptr && !options.replaceCompressedTextures) {
+            // If there is already a compressed texture but all we needed was the split textures then return
+            return true;
+        }
     }
     string fileName = imageFileName + ".ktx2";
     if (!imageData.writeKTX(fileName)) {
         return false;
     }
-
-    // Set as converted
-    images[image] = true;
 
     // Update texture with new image
     cgltf_image* newImage = nullptr;

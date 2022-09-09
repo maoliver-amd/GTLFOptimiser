@@ -26,6 +26,7 @@ public:
     struct Options
     {
         bool keepOriginalTextures = false;
+        bool replaceCompressedTextures = false;
     };
 
     Optimiser(const Options& opts) noexcept;
@@ -33,22 +34,51 @@ public:
     [[nodiscard]] bool pass(const std::string& inputFile, const std::string& outputFile) noexcept;
 
 private:
+    void checkInvalidImages() noexcept;
+
+    void checkInvalidTextures() noexcept;
+
+    void checkInvalidMaterials() noexcept;
+
+    void checkInvalidMeshes() noexcept;
+
+    void passInvalid() noexcept;
+
+    void checkUnusedImages() noexcept;
+
+    void checkUnusedTextures() noexcept;
+
+    void checkUnusedMaterials() noexcept;
+
+    void checkUnusedMeshes() noexcept;
+
+    void passUnused() noexcept;
+
+    void checkDuplicateImages() noexcept;
+
+    void checkDuplicateTextures() noexcept;
+
+    void checkDuplicateMaterials() noexcept;
+
+    void checkDuplicateMeshes() noexcept;
+
+    void passDuplicate() noexcept;
+
     [[nodiscard]] bool passTextures() noexcept;
 
     [[nodiscard]] bool passMeshes() noexcept;
 
-    void removeImage(cgltf_image* image, bool print = true) noexcept;
+    void removeImage(cgltf_image* image) noexcept;
 
-    void removeTexture(cgltf_texture* texture, bool print = true) noexcept;
+    void removeTexture(cgltf_texture* texture) noexcept;
 
-    void removeMesh(cgltf_mesh* mesh, bool print = true) noexcept;
+    void removeMaterial(cgltf_material* material) noexcept;
 
-    void removeMaterial(cgltf_material* material, bool print = true) noexcept;
+    void removeMesh(cgltf_mesh* mesh) noexcept;
 
     bool convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap, bool split = false) noexcept;
 
     std::string rootFolder;
     std::shared_ptr<cgltf_data> dataCGLTF = nullptr;
-    std::map<cgltf_image*, bool> images;
     Options options;
 };

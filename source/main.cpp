@@ -33,7 +33,11 @@ int main(int argc, char* argv[])
     string outputFile;
     app.add_option("-o,--output", outputFile, "The output GLTF file (defaults to input file)")->default_str(inputFile);
     bool keepTextures = false;
-    app.add_flag("-k,--keep-uncompressed-textures", keepTextures, "Keep original uncompressed textures");
+    app.add_flag("-k,--keep-uncompressed-textures", keepTextures, "Keep original uncompressed textures")->default_val(false);
+    bool regenCompressed = false;
+    app.add_flag(
+           "-r,--replace-compressed-textures", keepTextures, "Recreate and replace any existing compressed textures")
+        ->default_val(false);
     CLI11_PARSE(app, argc, argv);
     if (outputFile.empty()) {
         outputFile = inputFile;
@@ -42,6 +46,7 @@ int main(int argc, char* argv[])
     // Optimise meshes
     Optimiser::Options opts;
     opts.keepOriginalTextures = keepTextures;
+    opts.replaceCompressedTextures = regenCompressed;
     Optimiser opt(opts);
 
     if (!opt.pass(inputFile, outputFile)) {

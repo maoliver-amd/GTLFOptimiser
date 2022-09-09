@@ -80,6 +80,15 @@ bool Optimiser::pass(const std::string& inputFile, const std::string& outputFile
 
     // TODO: optionally strip material names, mesh names, camera names etc.
 
+    // Remove invalid objects
+    passInvalid();
+
+    // Check for unused objects
+    passUnused();
+
+    // Check for duplicate objects
+    passDuplicate();
+
     // Optimise meshes
     if (!passMeshes()) {
         return false;

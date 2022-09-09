@@ -57,6 +57,9 @@ target_sources(GLTFOptimiser PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/source/OptimiserRemove.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/OptimiserTexture.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/OptimiserMesh.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/OptimiserUnused.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/OptimiserDuplicate.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/OptimiserInvalid.cpp"
 )
 
 target_compile_features(GLTFOptimiser
