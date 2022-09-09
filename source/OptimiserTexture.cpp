@@ -55,8 +55,20 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         return false;
     }
 
+    // Get image file
     string imageFile = rootFolder + image->uri;
     const size_t fileExt = imageFile.rfind('.');
+    const vector<pair<string_view, string_view>> substitutions = {{"%20", " "}, {"%21", "!"}, {"%23", "#"},
+        {"%24", "$"}, {"%26", "&"}, {"%2B", "+"}, {"%2D", "-"}, {"%3D", "="}, {"%40", "@"}, {"%7E", "~"}};
+    for (const auto& i : substitutions) {
+        size_t pos = 0;
+        string_view search = i.first;
+        string_view replace = i.second;
+        while ((pos = imageFile.find(search, pos)) != string::npos) {
+            imageFile.replace(pos, search.length(), replace);
+            pos += replace.length();
+        }
+    }
     const string imageFileName = imageFile.substr(0, fileExt);
 
     // Check for existing basisu texture
