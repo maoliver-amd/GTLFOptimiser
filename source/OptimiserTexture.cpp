@@ -79,7 +79,7 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
             // Check for split textures
             const string metallicityFile = imageFileName + ".metallicity.ktx2";
             const string roughnessFile = imageFileName + ".roughness.ktx2";
-            if (ifstream(metallicityFile.c_str()).good() && ifstream(roughnessFile.c_str()).good()) {
+            if (ifstream(metallicityFile).good() && ifstream(roughnessFile).good()) {
                 return true;
             }
         }
@@ -114,7 +114,9 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         TextureLoad imageDataMetal(imageData, metalIndex);
         if (imageDataMetal.isUniqueTexture()) {
             const string metallicityFile = imageFileName + ".metallicity.ktx2";
-            if (!imageDataMetal.writeKTX(metallicityFile)) {
+            if (options.searchCompressedTextures && ifstream(metallicityFile).good()) {
+                printInfo("Using existing found metallicity texture '" + metallicityFile + "'");
+            } else if (!imageDataMetal.writeKTX(metallicityFile)) {
                 return false;
             }
         } else {
@@ -123,7 +125,9 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         TextureLoad imageDataRough(imageData, roughIndex);
         if (imageDataRough.isUniqueTexture()) {
             const string roughnessFile = imageFileName + ".roughness.ktx2";
-            if (!imageDataRough.writeKTX(roughnessFile)) {
+            if (options.searchCompressedTextures && ifstream(roughnessFile).good()) {
+                printInfo("Using existing found roughness texture '" + roughnessFile + "'");
+            } else if (!imageDataRough.writeKTX(roughnessFile)) {
                 return false;
             }
         } else {
@@ -136,7 +140,9 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         }
     }
     string fileName = imageFileName + ".ktx2";
-    if (!imageData.writeKTX(fileName)) {
+    if (options.searchCompressedTextures && ifstream(fileName).good()) {
+        printInfo("Using existing found texture '" + fileName + "'");
+    } else if (!imageData.writeKTX(fileName)) {
         return false;
     }
 

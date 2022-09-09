@@ -27,6 +27,7 @@ public:
     {
         bool keepOriginalTextures = false;
         bool replaceCompressedTextures = false;
+        bool searchCompressedTextures = false;
     };
 
     Optimiser(const Options& opts) noexcept;

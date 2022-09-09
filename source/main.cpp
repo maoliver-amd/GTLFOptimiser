@@ -33,10 +33,15 @@ int main(int argc, char* argv[])
     string outputFile;
     app.add_option("-o,--output", outputFile, "The output GLTF file (defaults to input file)")->default_str(inputFile);
     bool keepTextures = false;
-    app.add_flag("-k,--keep-uncompressed-textures", keepTextures, "Keep original uncompressed textures")->default_val(false);
+    app.add_flag("-k,--keep-uncompressed-textures", keepTextures, "Keep original uncompressed textures")
+        ->default_val(false);
     bool regenCompressed = false;
     app.add_flag(
-           "-r,--replace-compressed-textures", keepTextures, "Recreate and replace any existing compressed textures")
+           "-r,--replace-compressed-textures", regenCompressed, "Recreate and replace any existing compressed textures")
+        ->default_val(false);
+    bool checkExisting = false;
+    app.add_flag("-s,--search-existing-textures", checkExisting,
+           "Search to see if an existing compressed texture already exists and can be used instead")
         ->default_val(false);
     CLI11_PARSE(app, argc, argv);
     if (outputFile.empty()) {
@@ -47,6 +52,7 @@ int main(int argc, char* argv[])
     Optimiser::Options opts;
     opts.keepOriginalTextures = keepTextures;
     opts.replaceCompressedTextures = regenCompressed;
+    opts.searchCompressedTextures = checkExisting;
     Optimiser opt(opts);
 
     if (!opt.pass(inputFile, outputFile)) {
