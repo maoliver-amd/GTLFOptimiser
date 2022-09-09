@@ -255,10 +255,10 @@ bool TextureLoad::isUniqueTexture() noexcept
     // Check if all texels are identical
     auto func = [&]<typename T>(T* sourceData) {
         std::array<T, 4> check = {0};
-        bool zero = false;
+        bool zero = true;
         for (size_t k = 0; k < channelCount; ++k) {
             check[k] = sourceData[k];
-            zero &= check[k] == 0;
+            zero = zero && (check[k] == numeric_limits<T>::max());
         }
         if (!zero) {
             // Quick early out if texels values are non-zero
