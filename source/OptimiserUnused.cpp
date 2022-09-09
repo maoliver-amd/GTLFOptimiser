@@ -18,6 +18,7 @@
 #include "Shared.h"
 #include "SharedCGLTF.h"
 
+#include <ranges>
 #include <set>
 
 using namespace std;
@@ -25,7 +26,6 @@ using namespace std;
 void Optimiser::checkUnusedImages() noexcept
 {
     // Loop through all textures and check for unused images
-    set<cgltf_image*> removedImages;
     set<cgltf_image*> validImages;
     for (size_t i = 0; i < dataCGLTF->textures_count; ++i) {
         cgltf_texture& texture = dataCGLTF->textures[i];
@@ -36,7 +36,9 @@ void Optimiser::checkUnusedImages() noexcept
             validImages.insert(texture.image);
         }
     }
+
     // Loop through all images and compare against the found ones
+    set<cgltf_image*> removedImages;
     for (cgltf_size i = 0; i < dataCGLTF->images_count; ++i) {
         cgltf_image* image = &dataCGLTF->images[i];
         if (!validImages.contains(image)) {
@@ -45,7 +47,7 @@ void Optimiser::checkUnusedImages() noexcept
     }
 
     // Remove any found unused images
-    for (auto& i : removedImages) {
+    for (auto& i : removedImages | views::reverse) {
         printWarning("Removed unused image: "s + getName(*i));
         if (i->uri != nullptr) {
             // Delete file from disk
@@ -59,7 +61,6 @@ void Optimiser::checkUnusedImages() noexcept
 void Optimiser::checkUnusedTextures() noexcept
 {
     // Loop through all materials and check for unused textures
-    set<cgltf_texture*> removedTextures;
     set<cgltf_texture*> validTextures;
     for (size_t i = 0; i < dataCGLTF->materials_count; ++i) {
         cgltf_material& material = dataCGLTF->materials[i];
@@ -69,15 +70,18 @@ void Optimiser::checkUnusedTextures() noexcept
             }
         });
     }
+
     // Loop through all textures and compare against the found ones
+    set<cgltf_texture*> removedTextures;
     for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
         cgltf_texture* texture = &dataCGLTF->textures[i];
         if (!validTextures.contains(texture)) {
             removedTextures.insert(texture);
         }
     }
+
     // Remove any found unused textures
-    for (auto& i : removedTextures) {
+    for (auto& i : removedTextures | views::reverse) {
         printWarning("Removed unused texture: "s + getName(*i));
         removeTexture(i);
     }
@@ -96,6 +100,7 @@ void Optimiser::checkUnusedMaterials() noexcept
             }
         }
     }
+
     // Loop through all materials and compare against the found ones
     set<cgltf_material*> removedMaterials;
     for (cgltf_size i = 0; i < dataCGLTF->materials_count; ++i) {
@@ -106,7 +111,7 @@ void Optimiser::checkUnusedMaterials() noexcept
     }
 
     // Remove any found unused materials
-    for (auto& i : removedMaterials) {
+    for (auto& i : removedMaterials | views::reverse) {
         printWarning("Removed unused material: "s + getName(*i));
         removeMaterial(i);
     }
@@ -119,7 +124,7 @@ void Optimiser::checkUnusedMeshes() noexcept
     // TODO
 
     // Remove any found invalid meshes
-    for (auto& i : removedMeshes) {
+    for (auto& i : removedMeshes | views::reverse) {
         printWarning("Removed unused mesh: "s + getName(*i));
         removeMesh(i);
     }

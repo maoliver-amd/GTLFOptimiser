@@ -18,6 +18,7 @@
 #include "Shared.h"
 #include "SharedCGLTF.h"
 
+#include <map>
 #include <ranges>
 
 using namespace std;

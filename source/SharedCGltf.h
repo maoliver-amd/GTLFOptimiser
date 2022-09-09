@@ -37,6 +37,14 @@ const char* getName(const cgltf_texture& texture) noexcept;
 
 const char* getName(const cgltf_mesh& mesh) noexcept;
 
+bool isValid(const cgltf_image* image) noexcept;
+
+bool isValid(const cgltf_texture* texture) noexcept;
+
+bool isValid(const cgltf_material* material) noexcept;
+
+bool isValid(const cgltf_mesh* mesh) noexcept;
+
 template<typename Func>
 void runOverMaterialTextures(cgltf_material& material, Func function) noexcept
 {

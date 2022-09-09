@@ -19,8 +19,8 @@
 #include "SharedCGLTF.h"
 
 #include <map>
+#include <ranges>
 #include <set>
-#include <vector>
 
 using namespace std;
 
@@ -44,33 +44,36 @@ void Optimiser::removeImage(cgltf_image* image) noexcept
     }
 
     // Loop through all textures and set any matching pointers to null
-    cgltf_size j = 0;
-    while (true) {
-        cgltf_texture* current = &dataCGLTF->textures[j];
+    set<cgltf_texture*> removedTextures;
+    for (cgltf_size i = 0; i < dataCGLTF->textures_count; ++i) {
+        cgltf_texture* current = &dataCGLTF->textures[i];
         if (current->image == image) {
             current->image = nullptr;
         }
         if (current->basisu_image == image) {
             current->basisu_image = nullptr;
         }
-        // If texture has no valid images then remove it
-        if (current->image == nullptr && current->basisu_image == nullptr) {
-            removeTexture(current);
-            --j;
+        if (!isValid(current)) {
+            removedTextures.insert(current);
         }
-        if (++j >= dataCGLTF->textures_count) {
-            break;
-        }
+    }
+    // Remove any found invalid textures
+    for (auto& i : removedTextures | views::reverse) {
+        printWarning("Removed invalidated texture: "s + getName(*i));
+        removeTexture(i);
     }
 
     // Loop through all textures and update image pointers to compensate for list change
+    if (imagePos >= dataCGLTF->images_count) {
+        return;
+    }
     cgltf_image* current = &dataCGLTF->images[imagePos];
     for (cgltf_size k = 0; k < dataCGLTF->textures_count; ++k) {
         cgltf_texture& texture = dataCGLTF->textures[k];
-        if (texture.image >= current + 1) {
+        if (texture.image > current) {
             texture.image = texture.image - 1;
         }
-        if (texture.basisu_image >= current + 1) {
+        if (texture.basisu_image > current) {
             texture.basisu_image = texture.basisu_image - 1;
         }
     }
@@ -118,21 +121,33 @@ void Optimiser::removeTexture(cgltf_texture* texture) noexcept
     }
 
     // Loop through all materials and set any matching pointers to null
+    set<cgltf_material*> removedMaterials;
     for (cgltf_size j = 0; j < dataCGLTF->materials_count; ++j) {
-        cgltf_material& current = dataCGLTF->materials[j];
-        runOverMaterialTextures(current, [&](cgltf_texture*& p, bool, bool, bool = false) {
+        cgltf_material* current = &dataCGLTF->materials[j];
+        runOverMaterialTextures(*current, [&](cgltf_texture*& p, bool, bool, bool = false) {
             if (p == texture) {
                 p = nullptr;
             }
         });
+        if (!isValid(current)) {
+            removedMaterials.insert(current);
+        }
+    }
+    // Remove any found invalid materials
+    for (auto& i : removedMaterials | views::reverse) {
+        printWarning("Removed invalidated material: "s + getName(*i));
+        removeMaterial(i);
     }
 
     // Loop through all materials and update texture pointers to compensate for list change
+    if (texPos >= dataCGLTF->textures_count) {
+        return;
+    }
     cgltf_texture* current = &dataCGLTF->textures[texPos];
     for (cgltf_size k = 0; k < dataCGLTF->materials_count; ++k) {
         cgltf_material& material = dataCGLTF->materials[k];
         runOverMaterialTextures(material, [&](cgltf_texture*& p, bool, bool, bool = false) {
-            if (p >= current + 1) {
+            if (p > current) {
                 p = p - 1;
             }
         });
@@ -179,23 +194,35 @@ void Optimiser::removeMaterial(cgltf_material* material) noexcept
     }
 
     // Loop through all primitives and set any matching pointers to null
+    set<cgltf_mesh*> removedMeshes;
     for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
-        cgltf_mesh& mesh = dataCGLTF->meshes[i];
-        for (cgltf_size j = 0; j < mesh.primitives_count; ++j) {
-            cgltf_primitive& prim = mesh.primitives[j];
+        cgltf_mesh* current = &dataCGLTF->meshes[i];
+        for (cgltf_size j = 0; j < current->primitives_count; ++j) {
+            cgltf_primitive& prim = current->primitives[j];
             if (prim.material == material) {
                 prim.material = nullptr;
             }
         }
+        if (!isValid(current)) {
+            removedMeshes.insert(current);
+        }
+    }
+    // Remove any found invalid materials
+    for (auto& i : removedMeshes | views::reverse) {
+        printWarning("Removed invalidated mesh: "s + getName(*i));
+        removeMesh(i);
     }
 
     // Loop through all primitives and update material pointers to compensate for list change
+    if (matPos >= dataCGLTF->materials_count) {
+        return;
+    }
     cgltf_material* current = &dataCGLTF->materials[matPos];
     for (cgltf_size i = 0; i < dataCGLTF->meshes_count; ++i) {
         cgltf_mesh& mesh = dataCGLTF->meshes[i];
         for (cgltf_size k = 0; k < mesh.primitives_count; ++k) {
             cgltf_primitive& prim = mesh.primitives[k];
-            if (prim.material >= current + 1) {
+            if (prim.material > current) {
                 prim.material = prim.material - 1;
             }
         }
@@ -252,10 +279,13 @@ void Optimiser::removeMesh(cgltf_mesh* mesh) noexcept
     }
 
     // Loop through all nodes and update mesh pointers to compensate for list change
+    if (meshPos >= dataCGLTF->meshes_count) {
+        return;
+    }
     cgltf_mesh* current = &dataCGLTF->meshes[meshPos];
     for (cgltf_size k = 0; k < dataCGLTF->nodes_count; ++k) {
         cgltf_node& node = dataCGLTF->nodes[k];
-        if (node.mesh >= current + 1) {
+        if (node.mesh > current) {
             node.mesh = node.mesh - 1;
         }
     }

@@ -16,7 +16,6 @@
 #pragma once
 
 #include <cgltf.h>
-#include <map>
 #include <memory>
 #include <string>
 

@@ -20,6 +20,7 @@
 #include "Shared.h"
 
 #include <array>
+#include <fstream>
 #include <ktx.h>
 #include <stb_image.h>
 #include <stb_image_resize.h>
@@ -239,6 +240,11 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
     result = ktxTexture_WriteToNamedFile((ktxTexture*)texture.get(), fileName.c_str());
     if (result != KTX_SUCCESS) {
         printError("Failed writing ktx texture '"s + fileName + "'" + ": " + ktxErrorString(result));
+        return false;
+    }
+    // Double check file exists
+    if (!ifstream(fileName).good()) {
+        printError("Failed writing ktx texture '"s + fileName + "'" + ": Unknown error saving to disk");
         return false;
     }
     return true;

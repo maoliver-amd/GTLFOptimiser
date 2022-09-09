@@ -65,8 +65,7 @@ bool operator==(const cgltf_image& a, const cgltf_image& b) noexcept
 
 bool operator==(const cgltf_texture& a, const cgltf_texture& b) noexcept
 {
-    if ((a.image == b.image) && (a.basisu_image == b.basisu_image) &&
-        (a.sampler == b.sampler)) {
+    if ((a.image == b.image) && (a.basisu_image == b.basisu_image) && (a.sampler == b.sampler)) {
         return true;
     }
     return false;
@@ -115,6 +114,40 @@ const char* getName(const cgltf_texture& texture) noexcept
 const char* getName(const cgltf_mesh& mesh) noexcept
 {
     return (mesh.name != nullptr) ? mesh.name : "unnamed";
+}
+
+bool isValid(const cgltf_image* image) noexcept
+{
+    // TODO: support packed textures
+    if (image != nullptr) {
+        return image->uri != nullptr;
+    }
+    return false;
+}
+
+bool isValid(const cgltf_texture* texture) noexcept
+{
+    if (texture != nullptr) {
+        return ((texture->image != nullptr) || (texture->basisu_image != nullptr)) && (texture->sampler != nullptr);
+    }
+    return false;
+}
+
+bool isValid(const cgltf_material* material) noexcept
+{
+    if (material != nullptr) {
+        return true;
+    }
+    return false;
+}
+
+bool isValid(const cgltf_mesh* mesh) noexcept
+{
+    if (mesh != nullptr) {
+        return mesh->primitives_count != 0;
+    }
+    // TODO: check has valid materials
+    return false;
 }
 
 void cgltf_remove_mesh(cgltf_data* data, cgltf_mesh* mesh) noexcept
