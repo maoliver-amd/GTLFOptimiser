@@ -177,9 +177,10 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
         newImage = &dataCGLTF->images[dataCGLTF->images_count];
         *newImage = {0};
         string_view basisu = "/basisu"sv;
-        newImage->name = static_cast<char*>(malloc(strlen(image->name) + basisu.length() + 1));
+        const char* name = image->name != nullptr ? image->name : image->uri != nullptr ? image->uri : "";
+        newImage->name = static_cast<char*>(malloc(strlen(name) + basisu.length() + 1));
         if (newImage->name != nullptr) {
-            strcpy(newImage->name, image->name);
+            strcpy(newImage->name, name);
             strcat(newImage->name, basisu.data());
         }
         ++dataCGLTF->images_count;
