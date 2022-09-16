@@ -97,7 +97,7 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
     imageData.normalMap = normalMap;
 
     // Convert
-    if (split) {
+    if (split && options.splitMetalRoughTextures) {
         printInfo("Splitting texture: "s + imageFile);
         // Assumes we only want to split when metallicity/roughness
         uint32_t metalIndex = 2; // blue channel

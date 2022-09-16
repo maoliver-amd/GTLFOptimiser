@@ -43,6 +43,10 @@ int main(int argc, char* argv[])
     app.add_flag("-s,--search-existing-textures", checkExisting,
            "Search to see if an existing compressed texture already exists and can be used instead")
         ->default_val(false);
+    bool splitTextures = false;
+    app.add_flag("-t,--split-metal-rough", splitTextures,
+           "Split compressed metallicity/roughness textures into separate files (not GLTF standard)")
+        ->default_val(false);
     CLI11_PARSE(app, argc, argv);
     if (outputFile.empty()) {
         outputFile = inputFile;
@@ -53,6 +57,7 @@ int main(int argc, char* argv[])
     opts.keepOriginalTextures = keepTextures;
     opts.replaceCompressedTextures = regenCompressed;
     opts.searchCompressedTextures = checkExisting;
+    opts.splitMetalRoughTextures = splitTextures;
     Optimiser opt(opts);
 
     if (!opt.pass(inputFile, outputFile)) {
