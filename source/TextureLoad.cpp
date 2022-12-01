@@ -118,7 +118,7 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
     printInfo("Writing compressed texture: "s + fileName);
     // Check number of required mips for full pyramid
     uint32_t maxSize = std::max(imageWidth, imageHeight);
-    uint32_t numLevels = std::max(bit_width(maxSize), 1U);
+    uint32_t numLevels = std::max(std::bit_width(maxSize), 1);
 
     // Initialise data describing the new texture
     ktxTextureCreateInfo createInfo = {0};
