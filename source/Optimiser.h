@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#include "BS_thread_pool.hpp"
+
 #include <cgltf.h>
 #include <memory>
 #include <string>
@@ -82,4 +84,5 @@ private:
     std::string rootFolder;
     std::shared_ptr<cgltf_data> dataCGLTF = nullptr;
     Options options;
+    BS::thread_pool pool;
 };

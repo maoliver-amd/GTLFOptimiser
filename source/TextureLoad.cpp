@@ -216,7 +216,7 @@ bool TextureLoad::writeKTX(const string& fileName) noexcept
     params.uastcFlags = KTX_PACK_UASTC_MAX_LEVEL;
     params.uastcRDO = true;
     params.uastcRDOQualityScalar = 1.0f;
-    params.threadCount = thread::hardware_concurrency();
+    params.threadCount = 1;
     // params.normalMap = normalMap; //Converts to 2 channel compressed (loading such textures is not currently
     //  supported) so we do the below instead
     if (normalMap) {

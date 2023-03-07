@@ -16,36 +16,36 @@
 
 #include "Shared.h"
 
-#include <iostream>
+#include "BS_thread_pool.hpp"
 
-using namespace std;
+static BS::synced_stream sout;
 
 void printError(const std::string_view& message) noexcept
 {
-    cout << "Error: " << message << endl;
+    sout.println("Error: ", message);
 }
 
 void printError(const std::string& message) noexcept
 {
-    cout << "Error: " << message << endl;
+    sout.println("Error: ", message);
 }
 
 void printWarning(const std::string_view& message) noexcept
 {
-    cout << "Warning: " << message << endl;
+    sout.println("Warning: ", message);
 }
 
 void printWarning(const std::string& message) noexcept
 {
-    cout << "Warning: " << message << endl;
+    sout.println("Warning: ", message);
 }
 
 void printInfo(const std::string_view& message) noexcept
 {
-    cout << "Info: " << message << endl;
+    sout.println("Info: ", message);
 }
 
 void printInfo(const std::string& message) noexcept
 {
-    cout << "Info: " << message << endl;
+    sout.println("Info: ", message);
 }

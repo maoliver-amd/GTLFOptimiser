@@ -90,12 +90,22 @@ bool Optimiser::pass(const std::string& inputFile, const std::string& outputFile
     passDuplicate();
 
     // Optimise meshes
-    if (!passMeshes()) {
+    auto checkMeshes = pool.submit(&Optimiser::passMeshes, this);
+
+    // Wait for thread pool to complete all jobs before continuing
+    pool.wait_for_tasks();
+
+    if (!checkMeshes.get()) {
         return false;
     }
 
     // Optimise images
-    if (!passTextures()) {
+    auto checkTextures = pool.submit(&Optimiser::passTextures, this);
+
+    // Wait for thread pool to complete all jobs
+    pool.wait_for_tasks();
+
+    if (!checkTextures.get()) {
         return false;
     }
 

@@ -36,6 +36,7 @@ find_path(CGLTF_INCLUDE_DIRS "cgltf.h")
 find_package(CLI11 CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb_image.h")
 find_path(VULKAN_HEADERS_INCLUDE_DIRS "vulkan/vulkan_core.h")
+find_path(BSHOSHANY_THREAD_POOL_INCLUDE_DIRS "BS_thread_pool.hpp")
 
 add_executable(GLTFOptimiser)
 
@@ -73,6 +74,7 @@ target_include_directories(GLTFOptimiser
 	"${CGLTF_INCLUDE_DIRS}"
     "${STB_INCLUDE_DIRS}"
     "${VULKAN_HEADERS_INCLUDE_DIRS}"
+	"${BSHOSHANY_THREAD_POOL_INCLUDE_DIRS}"
 )
 
 if(MSVC)
@@ -91,7 +93,6 @@ target_link_libraries(GLTFOptimiser PRIVATE
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Header Files" REGULAR_EXPRESSION "*.h")
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" REGULAR_EXPRESSION "*.cpp")
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" REGULAR_EXPRESSION "*.qml")
 
 include(InstallRequiredSystemLibraries)
 set(CMAKE_INSTALL_UCRT_LIBRARIES TRUE)
