@@ -73,15 +73,17 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
 
     // Check for existing basisu texture
     if (texture->basisu_image != nullptr && !options.replaceCompressedTextures) {
-        if (!split) {
-            return true;
-        } else {
+        string fileName = imageFileName + ".ktx2";
+        if (split && options.splitMetalRoughTextures) {
             // Check for split textures
             const string metallicityFile = imageFileName + ".metallicity.ktx2";
             const string roughnessFile = imageFileName + ".roughness.ktx2";
-            if (ifstream(metallicityFile).good() && ifstream(roughnessFile).good()) {
+            if (ifstream(fileName).good() && ifstream(metallicityFile).good() && ifstream(roughnessFile).good()) {
                 return true;
             }
+        }
+        if (ifstream(fileName).good()) {
+            return true;
         }
     }
 
@@ -92,8 +94,7 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
 
     // Run texture conversion in thread
     pool.push_task(
-        [this](std::string imageFile, string imageFileName, bool sRGB, bool normalMap, bool split,
-            cgltf_texture* texture) {
+        [this](std::string imageFile, string imageFileName, bool sRGB, bool normalMap, bool split) {
             TextureLoad imageData(imageFile);
             if (imageData.data.get() == nullptr) {
                 return false;
@@ -103,56 +104,58 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
 
             // Convert
             if (split && options.splitMetalRoughTextures) {
-                printInfo("Splitting texture: "s + imageFile);
-                // Assumes we only want to split when metallicity/roughness
-                uint32_t metalIndex = 2; // blue channel
-                uint32_t roughIndex = 1; // green channel
-                if (imageData.channelCount == 2) {
-                    metalIndex = 0;
-                    roughIndex = 1;
-                } else if (imageData.channelCount != 3 && imageData.channelCount != 4) {
-                    printError("Unexpected channel count when splitting texture '" + imageFile + "'");
-                    return false;
-                }
-
-                // Split the files
-                TextureLoad imageDataMetal(imageData, metalIndex);
-                if (imageDataMetal.isUniqueTexture()) {
-                    const string metallicityFile = imageFileName + ".metallicity.ktx2";
-                    if (options.searchCompressedTextures && ifstream(metallicityFile).good()) {
-                        printInfo("Using existing found metallicity texture '" + metallicityFile + "'");
-                    } else if (!imageDataMetal.writeKTX(metallicityFile)) {
+                const string metallicityFile = imageFileName + ".metallicity.ktx2";
+                const string roughnessFile = imageFileName + ".roughness.ktx2";
+                bool metalicityFound = !options.replaceCompressedTextures && ifstream(metallicityFile).good();
+                bool roughnessFound = !options.replaceCompressedTextures && ifstream(roughnessFile).good();
+                if (!metalicityFound || !roughnessFound) {
+                    printInfo("Splitting texture: "s + imageFile);
+                    // Assumes we only want to split when metallicity/roughness
+                    uint32_t metalIndex = 2; // blue channel
+                    uint32_t roughIndex = 1; // green channel
+                    if (imageData.channelCount == 2) {
+                        metalIndex = 0;
+                        roughIndex = 1;
+                    } else if (imageData.channelCount != 3 && imageData.channelCount != 4) {
+                        printError("Unexpected channel count when splitting texture '" + imageFile + "'");
                         return false;
                     }
-                } else {
-                    printWarning("Skipping output of redundant split metallicity texture '" + imageFile + "'");
-                }
-                TextureLoad imageDataRough(imageData, roughIndex);
-                if (imageDataRough.isUniqueTexture()) {
-                    const string roughnessFile = imageFileName + ".roughness.ktx2";
-                    if (options.searchCompressedTextures && ifstream(roughnessFile).good()) {
-                        printInfo("Using existing found roughness texture '" + roughnessFile + "'");
-                    } else if (!imageDataRough.writeKTX(roughnessFile)) {
-                        return false;
+
+                    // Split the files
+                    TextureLoad imageDataMetal(imageData, metalIndex);
+                    if (imageDataMetal.isUniqueTexture()) {
+                        if (metalicityFound) {
+                            printInfo("Using existing found metallicity texture '" + metallicityFile + "'");
+                        } else if (!imageDataMetal.writeKTX(metallicityFile)) {
+                            return false;
+                        }
+                    } else {
+                        printWarning("Skipping output of redundant split metallicity texture '" + imageFile + "'");
+                    }
+                    TextureLoad imageDataRough(imageData, roughIndex);
+                    if (imageDataRough.isUniqueTexture()) {
+                        if (roughnessFound) {
+                            printInfo("Using existing found roughness texture '" + roughnessFile + "'");
+                        } else if (!imageDataRough.writeKTX(roughnessFile)) {
+                            return false;
+                        }
+                    } else {
+                        printWarning("Skipping output of redundant split roughness texture '" + imageFile + "'");
                     }
                 } else {
-                    printWarning("Skipping output of redundant split roughness texture '" + imageFile + "'");
-                }
-
-                if (texture->basisu_image != nullptr && !options.replaceCompressedTextures) {
-                    // If there is already a compressed texture but all we needed was the split textures then return
-                    return true;
+                    printInfo("Using existing metallicity and roughness textures '" + metallicityFile + ", " +
+                        roughnessFile + "'");
                 }
             }
             string fileName = imageFileName + ".ktx2";
-            if (options.searchCompressedTextures && ifstream(fileName).good()) {
+            if (!options.replaceCompressedTextures && ifstream(fileName).good()) {
                 printInfo("Using existing found texture '" + fileName + "'");
             } else if (!imageData.writeKTX(fileName)) {
                 return false;
             }
             return true;
         },
-        imageFile, imageFileName, sRGB, normalMap, split, texture);
+        imageFile, imageFileName, sRGB, normalMap, split);
 
     // Update texture with new image
     cgltf_image* newImage = nullptr;

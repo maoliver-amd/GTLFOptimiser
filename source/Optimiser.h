@@ -28,7 +28,6 @@ public:
     {
         bool keepOriginalTextures = false;
         bool replaceCompressedTextures = false;
-        bool searchCompressedTextures = false;
         bool splitMetalRoughTextures = false;
     };
 
