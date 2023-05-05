@@ -48,7 +48,7 @@ bool Optimiser::pass(const std::string& inputFile, const std::string& outputFile
     cgltf_result result = cgltf_result_success;
     dataCGLTF = shared_ptr<cgltf_data>(
         [&]() {
-            cgltf_data* data;
+            cgltf_data* data = nullptr;
             result = cgltf_parse_file(&optionsCGLTF, inputFile.c_str(), &data);
             return data;
         }(),
