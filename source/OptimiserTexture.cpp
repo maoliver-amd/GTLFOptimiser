@@ -56,20 +56,21 @@ bool Optimiser::convertTexture(cgltf_texture* texture, bool sRGB, bool normalMap
     }
 
     // Get image file
-    string imageFile = rootFolder + image->uri;
-    const size_t fileExt = imageFile.rfind('.');
+    string imageFileName = rootFolder + image->uri;
     const vector<pair<string_view, string_view>> substitutions = {{"%20", " "}, {"%21", "!"}, {"%23", "#"},
         {"%24", "$"}, {"%26", "&"}, {"%2B", "+"}, {"%2D", "-"}, {"%3D", "="}, {"%40", "@"}, {"%7E", "~"}};
     for (const auto& i : substitutions) {
         size_t pos = 0;
         string_view search = i.first;
         string_view replace = i.second;
-        while ((pos = imageFile.find(search, pos)) != string::npos) {
-            imageFile.replace(pos, search.length(), replace);
+        while ((pos = imageFileName.find(search, pos)) != string::npos) {
+            imageFileName.replace(pos, search.length(), replace);
             pos += replace.length();
         }
     }
-    const string imageFileName = imageFile.substr(0, fileExt);
+    const size_t fileExt = imageFileName.rfind('.');
+    const string imageFile = imageFileName;
+    imageFileName.erase(fileExt);
 
     // Check for existing basisu texture
     if (texture->basisu_image != nullptr && !options.replaceCompressedTextures) {

@@ -20,6 +20,7 @@
 #include "Shared.h"
 
 #include <array>
+#include <bit>
 #include <fstream>
 #include <ktx.h>
 #include <stb_image.h>
